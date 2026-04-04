@@ -119,6 +119,7 @@ const adminT = {
   fr: {
     login: "Accès gestion", password: "Mot de passe", enter: "Entrer", wrong: "Mot de passe incorrect",
     title: "Gestion des commandes", date: "Date", today: "Aujourd'hui", tomorrow: "Demain",
+    thisWeek: "Semaine", thisMonth: "Mois", from: "Du", to: "Au",
     total: "Total", bookings: "commandes", surPlace: "Sur place", emporter: "À emporter",
     items: "Détail produits", arrived: "Arrivé", noShow: "Absent", cancel: "Annuler",
     confirmed: "Confirmé", completed: "Arrivé", cancelled: "Annulé", no_show: "Absent",
@@ -128,6 +129,7 @@ const adminT = {
   zh: {
     login: "管理登录", password: "密码", enter: "进入", wrong: "密码错误",
     title: "订单管理", date: "日期", today: "今天", tomorrow: "明天",
+    thisWeek: "本周", thisMonth: "本月", from: "从", to: "至",
     total: "合计", bookings: "订单", surPlace: "堂食", emporter: "外带",
     items: "菜品明细", arrived: "已到", noShow: "未到", cancel: "取消",
     confirmed: "已确认", completed: "已到店", cancelled: "已取消", no_show: "未到",
@@ -138,35 +140,45 @@ const adminT = {
 
 const statusColors = { confirmed: "#16a34a", completed: "#2563eb", cancelled: "#9ca3af", no_show: "#dc2626" };
 
+function getDatesInRange(from, to) {
+  const dates = []; const d = new Date(from);
+  while (d <= new Date(to)) { dates.push(d.toISOString().split("T")[0]); d.setDate(d.getDate() + 1); }
+  return dates;
+}
+
 function AdminPanel() {
   const [lang, setLang] = useState("fr");
   const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1");
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const today = new Date().toISOString().split("T")[0];
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(today);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const A = adminT[lang];
 
-  const fetchBookings = async (d) => {
+  const fetchRange = async (from, to) => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`);
-      const data = await r.json();
-      setBookings(data.bookings || []);
+      const dates = getDatesInRange(from, to);
+      const results = await Promise.all(dates.map(d => fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`).then(r => r.json())));
+      setBookings(results.flatMap(r => r.bookings || []));
     } catch { setBookings([]); }
     setLoading(false);
   };
 
-  useEffect(() => { if (authed) fetchBookings(selectedDate); }, [authed, selectedDate]);
+  const setRange = (from, to) => { setDateFrom(from); setDateTo(to); };
+
+  useEffect(() => { if (authed) fetchRange(dateFrom, dateTo); }, [authed, dateFrom, dateTo]);
 
   const updateStatus = async (id, status) => {
     await fetch(`${API}/api/booking/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS, status }),
     });
-    fetchBookings(selectedDate);
+    fetchRange(dateFrom, dateTo);
   };
 
   const handleLogin = () => {
@@ -174,8 +186,12 @@ function AdminPanel() {
     else setPwdErr(true);
   };
 
-  const today = new Date().toISOString().split("T")[0];
   const tmr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split("T")[0]; })();
+  const weekEnd = (() => { const d = new Date(weekStart); d.setDate(d.getDate() + 6); return d.toISOString().split("T")[0]; })();
+  const monthStart = today.slice(0, 8) + "01";
+  const monthEnd = (() => { const d = new Date(today.slice(0, 4), parseInt(today.slice(5, 7)), 0); return d.toISOString().split("T")[0]; })();
+  const isActive = (f, t) => dateFrom === f && dateTo === t;
 
   const surPlace = bookings.filter(b => b.type === "surPlace" && b.status !== "cancelled");
   const emporter = bookings.filter(b => b.type === "emporter" && b.status !== "cancelled");
@@ -221,12 +237,24 @@ function AdminPanel() {
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
 
-        {/* Date selector */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setSelectedDate(today)} style={{ flex: 1, padding: 10, borderRadius: 10, border: selectedDate === today ? "2px solid #8B0000" : "1px solid #ddd", background: selectedDate === today ? "rgba(139,0,0,0.05)" : "white", color: selectedDate === today ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{A.today}</button>
-          <button onClick={() => setSelectedDate(tmr)} style={{ flex: 1, padding: 10, borderRadius: 10, border: selectedDate === tmr ? "2px solid #8B0000" : "1px solid #ddd", background: selectedDate === tmr ? "rgba(139,0,0,0.05)" : "white", color: selectedDate === tmr ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{A.tomorrow}</button>
-          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 13, outline: "none" }} />
-          <button onClick={() => fetchBookings(selectedDate)} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 16 }}>🔄</button>
+        {/* Date selector — quick buttons */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+          {[
+            { label: A.today, f: today, t: today },
+            { label: A.tomorrow, f: tmr, t: tmr },
+            { label: A.thisWeek, f: weekStart, t: weekEnd },
+            { label: A.thisMonth, f: monthStart, t: monthEnd },
+          ].map((btn, i) => (
+            <button key={i} onClick={() => setRange(btn.f, btn.t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: isActive(btn.f, btn.t) ? "2px solid #8B0000" : "1px solid #ddd", background: isActive(btn.f, btn.t) ? "rgba(139,0,0,0.05)" : "white", color: isActive(btn.f, btn.t) ? "#8B0000" : "#666", fontWeight: 600, fontSize: 12, cursor: "pointer", minWidth: 60 }}>{btn.label}</button>
+          ))}
+        </div>
+        {/* Custom range */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#999" }}>{A.from}</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, outline: "none" }} />
+          <span style={{ fontSize: 12, color: "#999" }}>{A.to}</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, outline: "none" }} />
+          <button onClick={() => fetchRange(dateFrom, dateTo)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 14 }}>🔄</button>
         </div>
 
         {/* Summary cards */}
@@ -373,7 +401,7 @@ export default function App() {
 
   const [lang, setLang] = useState("fr");
   const [cart, setCart] = useState({});
-  const [view, setView] = useState("menu");
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -401,11 +429,11 @@ export default function App() {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch("https://mcp.clawshow.ai/api/booking", {
+      const res = await fetch(`${API}/api/booking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          namespace: "neige-rouge",
+          namespace: NS,
           customer_name: form.name,
           customer_phone: form.phone,
           customer_email: "",
@@ -420,7 +448,7 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setSubmitted(true);
-        setView("menu");
+        setShowForm(false);
       } else {
         setSubmitError(data.error || "Erreur lors de la commande");
       }
@@ -488,188 +516,130 @@ export default function App() {
         </div>
       </div>
 
-      {/* Tab nav */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 50,
-        background: "rgba(250,248,245,0.95)", backdropFilter: "blur(12px)",
-        borderBottom: "1px solid #eee",
-        display: "flex", justifyContent: "center", gap: 0,
-      }}>
-        {["menu", "order"].map(v => (
-          <button key={v} onClick={() => setView(v)} style={{
-            padding: "14px 24px", border: "none", background: "transparent",
-            fontSize: 13, fontWeight: 600, cursor: "pointer", position: "relative",
-            color: view === v ? "#8B0000" : "#999",
-            borderBottom: view === v ? "2px solid #8B0000" : "2px solid transparent",
+      {/* Menu — single page, no tabs */}
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 16px 120px" }}>
+        <Section title={T.sections.menus}>
+          {MENU.menus.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.plats}>
+          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.sandwiches}>
+          {MENU.sandwiches.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.bubbleTea}>
+          {MENU.bubbleTea.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.carte}>
+          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.boissons}>
+          {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.desserts}>
+          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+      </div>
+
+      {/* Order form slide-up panel */}
+      {showForm && cartCount > 0 && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.4)",
+        }} onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}>
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            background: "#faf8f5", borderRadius: "20px 20px 0 0",
+            padding: "24px 16px 32px", maxHeight: "85vh", overflowY: "auto",
           }}>
-            {v === "menu" ? T.nav.menu : T.nav.order}
-            {v === "order" && cartCount > 0 && (
-              <span style={{
-                position: "absolute", top: 8, right: 4,
-                background: "#8B0000", color: "white", borderRadius: 10,
-                fontSize: 10, fontWeight: 700, padding: "1px 6px", minWidth: 16, textAlign: "center",
-              }}>{cartCount}</span>
-            )}
-          </button>
-        ))}
-      </div>
+            <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
 
-      <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 16px 100px" }}>
-
-        {/* MENU VIEW */}
-        {view === "menu" && (
-          <>
-            <Section title={T.sections.menus}>
-              {MENU.menus.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.plats}>
-              {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.sandwiches}>
-              {MENU.sandwiches.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.bubbleTea}>
-              {MENU.bubbleTea.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.carte}>
-              {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.boissons}>
-              {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-            <Section title={T.sections.desserts}>
-              {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
-          </>
-        )}
-
-        {/* ORDER VIEW */}
-        {view === "order" && (
-          <>
-            {cartItems.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px 0", color: "#ccc" }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🛒</div>
-                <p>{T.order.empty}</p>
+            {/* Cart summary */}
+            <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 16, border: "1px solid #eee" }}>
+              {cartItems.map((item, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < cartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</span>
+                    <span style={{ color: "#999", marginLeft: 6, fontSize: 13 }}>×{item.qty}</span>
+                  </div>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600, fontSize: 14 }}>{(item.price * item.qty).toFixed(2)}€</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 8px", borderTop: "2px solid #8B0000" }}>
+                <span style={{ fontWeight: 700 }}>{T.order.total}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</span>
               </div>
-            ) : (
-              <>
-                {/* Cart items */}
-                <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 20, border: "1px solid #eee" }}>
-                  {cartItems.map((item, i) => (
-                    <div key={i} style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "14px 0",
-                      borderBottom: i < cartItems.length - 1 ? "1px solid #f0f0f0" : "none",
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</span>
-                        <span style={{ color: "#999", marginLeft: 6, fontSize: 13 }}>×{item.qty}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600 }}>
-                          {(item.price * item.qty).toFixed(2)}€
-                        </span>
-                        <button onClick={() => remove(item.id)} style={{
-                          width: 24, height: 24, borderRadius: "50%", border: "1px solid #ddd",
-                          background: "white", color: "#999", fontSize: 14, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>×</button>
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "16px 0 12px", borderTop: "2px solid #8B0000" }}>
-                    <span style={{ fontWeight: 700, fontSize: 16 }}>{T.order.total}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</span>
-                  </div>
+            </div>
+
+            {/* Form fields */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                {["surPlace", "emporter"].map(type => (
+                  <button key={type} onClick={() => setForm({ ...form, type })} style={{
+                    flex: 1, padding: "12px", borderRadius: 10,
+                    border: form.type === type ? "2px solid #8B0000" : "1px solid #ddd",
+                    background: form.type === type ? "rgba(139,0,0,0.05)" : "white",
+                    color: form.type === type ? "#8B0000" : "#999",
+                    fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  }}>{T.order[type]}</button>
+                ))}
+              </div>
+
+              {[{ key: "name", type: "text" }, { key: "phone", type: "tel" }].map(({ key, type }) => (
+                <div key={key}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 4, display: "block" }}>{T.order[key]} *</label>
+                  <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{
+                    width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", fontSize: 16, outline: "none", boxSizing: "border-box",
+                  }} />
                 </div>
+              ))}
 
-                {/* Form */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {/* Pickup type */}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {["surPlace", "emporter"].map(type => (
-                      <button key={type} onClick={() => setForm({ ...form, type })} style={{
-                        flex: 1, padding: "12px", borderRadius: 10,
-                        border: form.type === type ? "2px solid #8B0000" : "1px solid #ddd",
-                        background: form.type === type ? "rgba(139,0,0,0.05)" : "white",
-                        color: form.type === type ? "#8B0000" : "#999",
-                        fontSize: 14, fontWeight: 600, cursor: "pointer",
-                      }}>{T.order[type]}</button>
-                    ))}
-                  </div>
-
-                  {[
-                    { key: "name", type: "text" },
-                    { key: "phone", type: "tel" },
-                  ].map(({ key, type }) => (
-                    <div key={key}>
-                      <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 6, display: "block" }}>
-                        {T.order[key]} *
-                      </label>
-                      <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{
-                        width: "100%", padding: "12px 14px", borderRadius: 10,
-                        border: "1px solid #ddd", background: "white", color: "#1a1a1a",
-                        fontSize: 16, outline: "none", boxSizing: "border-box",
-                      }} />
-                    </div>
-                  ))}
-
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 6, display: "block" }}>{T.order.date}</label>
-                      <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={{
-                        width: "100%", padding: "12px 14px", borderRadius: 10,
-                        border: "1px solid #ddd", background: "white", color: "#1a1a1a",
-                        fontSize: 15, outline: "none", boxSizing: "border-box",
-                      }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 6, display: "block" }}>{T.order.time}</label>
-                      <select value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} style={{
-                        width: "100%", padding: "12px 14px", borderRadius: 10,
-                        border: "1px solid #ddd", background: "white", color: "#1a1a1a",
-                        fontSize: 15, outline: "none", boxSizing: "border-box",
-                      }}>
-                        {["11:30","11:45","12:00","12:15","12:30","12:45","13:00","13:15","13:30","13:45","14:00"].map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 6, display: "block" }}>{T.order.notes}</label>
-                    <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} style={{
-                      width: "100%", padding: "12px 14px", borderRadius: 10,
-                      border: "1px solid #ddd", background: "white", color: "#1a1a1a",
-                      fontSize: 15, outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box",
-                    }} />
-                  </div>
-
-                  {submitError && (
-                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>
-                      {submitError}
-                    </div>
-                  )}
-
-                  <button onClick={handleSubmit} disabled={!form.name || !form.phone || submitting} style={{
-                    padding: "16px", borderRadius: 12, border: "none",
-                    background: form.name && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
-                    color: form.name && form.phone && !submitting ? "white" : "#999",
-                    fontSize: 16, fontWeight: 700, cursor: form.name && form.phone && !submitting ? "pointer" : "default",
-                    letterSpacing: 0.5, marginTop: 4, opacity: submitting ? 0.7 : 1,
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 4, display: "block" }}>{T.order.date}</label>
+                  <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={{
+                    width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", fontSize: 15, outline: "none", boxSizing: "border-box",
+                  }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 4, display: "block" }}>{T.order.time}</label>
+                  <select value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} style={{
+                    width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", fontSize: 15, outline: "none", boxSizing: "border-box",
                   }}>
-                    {submitting ? (lang === "fr" ? "Envoi en cours..." : "提交中...") : `${T.order.submit} · ${total.toFixed(2)}€`}
-                  </button>
+                    {["11:30","11:45","12:00","12:15","12:30","12:45","13:00","13:15","13:30","13:45","14:00","14:15","14:30"].map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
                 </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
+              </div>
 
-      {/* Floating cart bar */}
-      {view === "menu" && cartCount > 0 && (
+              <div>
+                <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 4, display: "block" }}>{T.order.notes}</label>
+                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} style={{
+                  width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", fontSize: 15, outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box",
+                }} />
+              </div>
+
+              {submitError && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>{submitError}</div>
+              )}
+
+              <button onClick={handleSubmit} disabled={!form.name || !form.phone || submitting} style={{
+                padding: "16px", borderRadius: 12, border: "none",
+                background: form.name && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
+                color: form.name && form.phone && !submitting ? "white" : "#999",
+                fontSize: 16, fontWeight: 700, cursor: form.name && form.phone && !submitting ? "pointer" : "default",
+                opacity: submitting ? 0.7 : 1,
+              }}>
+                {submitting ? (lang === "fr" ? "Envoi en cours..." : "提交中...") : `${T.order.submit} · ${total.toFixed(2)}€`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating cart bar — always visible when items in cart */}
+      {cartCount > 0 && !showForm && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
           background: "rgba(250,248,245,0.95)", backdropFilter: "blur(12px)",
@@ -680,7 +650,7 @@ export default function App() {
               <div style={{ fontSize: 12, color: "#999" }}>{cartCount} {lang === "fr" ? "article(s)" : "件"}</div>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</div>
             </div>
-            <button onClick={() => setView("order")} style={{
+            <button onClick={() => setShowForm(true)} style={{
               background: "#8B0000", color: "white", border: "none",
               padding: "12px 28px", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer",
             }}>
@@ -690,9 +660,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer */}
+      {/* Footer with discrete admin link */}
       <div style={{ textAlign: "center", padding: "20px", fontSize: 11, color: "#ccc" }}>
         Powered by ClawShow · neigerouge.fr
+        <span style={{ margin: "0 6px" }}>·</span>
+        <a href="#admin" style={{ color: "#ddd", textDecoration: "none" }}>Gestion</a>
       </div>
     </div>
   );
