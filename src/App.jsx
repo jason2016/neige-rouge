@@ -286,47 +286,72 @@ function AdminPanel() {
           </div>
         )}
 
-        {/* Booking list */}
+        {/* Booking cards — two sections */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
         ) : bookings.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>{A.noBookings}</div>
-        ) : (
-          bookings.map(b => (
-            <div key={b.id} style={{ background: "white", borderRadius: 14, padding: 16, marginBottom: 10, border: "1px solid #eee" }}>
-              {/* Header row */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: 15 }}>{b.customer_name}</span>
-                  <span style={{ color: "#999", marginLeft: 8, fontSize: 13 }}>{b.customer_phone}</span>
+        ) : (<>
+          {/* Pending section */}
+          {bookings.filter(b => b.status === "confirmed").length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#16a34a", marginBottom: 10 }}>
+                ● {lang === "fr" ? "En attente" : "待接待"} ({bookings.filter(b => b.status === "confirmed").length})
+              </div>
+              {bookings.filter(b => b.status === "confirmed").map(b => (
+                <div key={b.id} style={{ background: "white", borderRadius: 16, padding: 16, marginBottom: 10, border: "2px solid #16a34a", position: "relative" }}>
+                  <div style={{ position: "absolute", top: -1, right: 16, background: "#16a34a", color: "white", borderRadius: "0 0 8px 8px", padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
+                    {b.type === "surPlace" ? "🍽" : "📦"} {A[b.type] || b.type}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: "#8B0000" }}>#{b.booking_code || "?"}</span>
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>{b.customer_name}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>
+                    📞 {b.customer_phone} · 🕐 {b.booking_time} · 📅 {b.booking_date}
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                    {(b.items || []).map((item, i) => <span key={i} style={{ marginRight: 8 }}>{item.name} ×{item.qty}</span>)}
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700 }}>{(b.total || 0).toFixed(2)}€</span>
+                  </div>
+                  {b.notes && <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontStyle: "italic" }}>📝 {b.notes}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 2, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
+                    <button onClick={() => updateStatus(b.id, "no_show")} style={{ flex: 1, padding: 14, borderRadius: 12, border: "none", background: "#dc2626", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✗ {A.noShow}</button>
+                    <button onClick={() => updateStatus(b.id, "cancelled")} style={{ padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#999", fontSize: 14, cursor: "pointer" }}>✕</button>
+                  </div>
                 </div>
-                <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
-                  {A[b.status] || b.status}
-                </span>
-              </div>
-              {/* Details */}
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
-                🕐 {b.booking_time} · {b.type === "surPlace" ? `🍽 ${A.surPlace}` : `📦 ${A.emporter}`}
-              </div>
-              {/* Items */}
-              <div style={{ fontSize: 13, marginBottom: 10 }}>
-                {(b.items || []).map((item, i) => (
-                  <span key={i} style={{ marginRight: 8 }}>{item.name} ×{item.qty}</span>
-                ))}
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginLeft: 4 }}>{(b.total || 0).toFixed(2)}€</span>
-              </div>
-              {b.notes && <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontStyle: "italic" }}>📝 {b.notes}</div>}
-              {/* Action buttons */}
-              {b.status === "confirmed" && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#16a34a", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
-                  <button onClick={() => updateStatus(b.id, "no_show")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#dc2626", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✗ {A.noShow}</button>
-                  <button onClick={() => updateStatus(b.id, "cancelled")} style={{ padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#999", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{A.cancel}</button>
-                </div>
-              )}
+              ))}
             </div>
-          ))
-        )}
+          )}
+
+          {/* Completed/other section */}
+          {bookings.filter(b => b.status !== "confirmed").length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#999", marginBottom: 10 }}>
+                ● {lang === "fr" ? "Traité" : "已处理"} ({bookings.filter(b => b.status !== "confirmed").length})
+              </div>
+              {bookings.filter(b => b.status !== "confirmed").map(b => (
+                <div key={b.id} style={{ background: "#fafafa", borderRadius: 12, padding: 12, marginBottom: 6, border: "1px solid #eee", opacity: 0.7 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: "#999" }}>#{b.booking_code || "?"}</span>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>{b.customer_name}</span>
+                      <span style={{ fontSize: 12, color: "#999" }}>{b.booking_time}</span>
+                    </div>
+                    <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+                      {A[b.status] || b.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+                    {(b.items || []).map((item, i) => <span key={i} style={{ marginRight: 6 }}>{item.name}×{item.qty}</span>)}
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{(b.total || 0).toFixed(2)}€</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>)}
       </div>
     </div>
   );
@@ -406,6 +431,7 @@ export default function App() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [bookingCode, setBookingCode] = useState("");
 
   const T = t[lang];
   const allItems = [...MENU.menus, ...MENU.plats, ...MENU.sandwiches, ...MENU.bubbleTea, ...MENU.carte, ...MENU.boissons, ...MENU.desserts];
@@ -447,6 +473,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
+        setBookingCode(data.booking_code || "");
         setSubmitted(true);
         setShowForm(false);
       } else {
@@ -464,9 +491,20 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet" />
         <div style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 64, marginBottom: 20 }}>🎉</div>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: "#8B0000", marginBottom: 12 }}>{T.order.success}</h2>
-          <p style={{ color: "#888", fontSize: 15, marginBottom: 8 }}>{T.order.successMsg}</p>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: "#8B0000", marginBottom: 8 }}>{T.order.success}</h2>
+          {bookingCode && (
+            <div style={{ margin: "16px 0", padding: "16px 24px", background: "white", borderRadius: 14, border: "2px solid #8B0000", display: "inline-block" }}>
+              <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
+                {lang === "fr" ? "Votre numéro" : "您的号码"}
+              </div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 48, fontWeight: 700, color: "#8B0000" }}>#{bookingCode}</div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                {lang === "fr" ? "Présentez ce numéro à votre arrivée" : "到店时出示此号码"}
+              </div>
+            </div>
+          )}
+          <p style={{ color: "#888", fontSize: 15, marginTop: 12 }}>{T.order.successMsg}</p>
           <div style={{ background: "white", borderRadius: 12, padding: 20, margin: "24px 0", textAlign: "left", border: "1px solid #eee" }}>
             <div style={{ fontSize: 14, marginBottom: 6 }}><strong>{form.name}</strong> · {form.phone}</div>
             <div style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>{form.date} · {form.time} · {T.order[form.type === "surPlace" ? "surPlace" : "emporter"]}</div>
