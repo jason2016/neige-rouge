@@ -310,9 +310,16 @@ function AdminPanel() {
                   <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>
                     📞 {b.customer_phone} · 🕐 {b.booking_time} · 📅 {b.booking_date}
                   </div>
-                  <div style={{ fontSize: 13, marginBottom: 8 }}>
-                    {(b.items || []).map((item, i) => <span key={i} style={{ marginRight: 8 }}>{item.name} ×{item.qty}</span>)}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700 }}>{(b.total || 0).toFixed(2)}€</span>
+                  <div style={{ marginBottom: 10 }}>
+                    {(b.items || []).map((item, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{item.name} <span style={{ color: "#999", fontWeight: 400, fontSize: 14 }}>×{item.qty}</span></span>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: "#8B0000" }}>{(item.price * (item.qty || 1)).toFixed(2)}€</span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6, paddingTop: 8, borderTop: "2px solid #8B0000" }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 700, color: "#8B0000" }}>{(b.total || 0).toFixed(2)}€</span>
+                    </div>
                   </div>
                   {b.notes && <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontStyle: "italic" }}>📝 {b.notes}</div>}
                   <div style={{ display: "flex", gap: 8 }}>
