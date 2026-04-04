@@ -192,6 +192,14 @@ function AdminPanel() {
   const monthStart = today.slice(0, 8) + "01";
   const monthEnd = (() => { const d = new Date(today.slice(0, 4), parseInt(today.slice(5, 7)), 0); return d.toISOString().split("T")[0]; })();
   const isActive = (f, t) => dateFrom === f && dateTo === t;
+  const isMultiDay = dateFrom !== dateTo;
+
+  const fmt = (d) => d.slice(8, 10) + "/" + d.slice(5, 7);
+  const monthNames = { fr: ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"], zh: ["","1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"] };
+  const monthLabel = monthNames[lang]?.[parseInt(today.slice(5, 7))] || today.slice(5, 7);
+
+  const pendingBookings = bookings.filter(b => b.status === "confirmed").sort((a, b) => (a.booking_date + a.booking_time).localeCompare(b.booking_date + b.booking_time));
+  const doneBookings = bookings.filter(b => b.status !== "confirmed").sort((a, b) => (b.booking_date + b.booking_time).localeCompare(a.booking_date + a.booking_time));
 
   const surPlace = bookings.filter(b => b.type === "surPlace" && b.status !== "cancelled");
   const emporter = bookings.filter(b => b.type === "emporter" && b.status !== "cancelled");
@@ -240,10 +248,10 @@ function AdminPanel() {
         {/* Date selector — quick buttons */}
         <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
           {[
-            { label: A.today, f: today, t: today },
-            { label: A.tomorrow, f: tmr, t: tmr },
-            { label: A.thisWeek, f: weekStart, t: weekEnd },
-            { label: A.thisMonth, f: monthStart, t: monthEnd },
+            { label: `${A.today} (${fmt(today)})`, f: today, t: today },
+            { label: `${A.tomorrow} (${fmt(tmr)})`, f: tmr, t: tmr },
+            { label: `${A.thisWeek} (${fmt(weekStart)}-${fmt(weekEnd)})`, f: weekStart, t: weekEnd },
+            { label: `${A.thisMonth} (${monthLabel})`, f: monthStart, t: monthEnd },
           ].map((btn, i) => (
             <button key={i} onClick={() => setRange(btn.f, btn.t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: isActive(btn.f, btn.t) ? "2px solid #8B0000" : "1px solid #ddd", background: isActive(btn.f, btn.t) ? "rgba(139,0,0,0.05)" : "white", color: isActive(btn.f, btn.t) ? "#8B0000" : "#666", fontWeight: 600, fontSize: 12, cursor: "pointer", minWidth: 60 }}>{btn.label}</button>
           ))}
@@ -293,12 +301,12 @@ function AdminPanel() {
           <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>{A.noBookings}</div>
         ) : (<>
           {/* Pending section */}
-          {bookings.filter(b => b.status === "confirmed").length > 0 && (
+          {pendingBookings.length > 0 && (
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#16a34a", marginBottom: 10 }}>
-                ● {lang === "fr" ? "En attente" : "待接待"} ({bookings.filter(b => b.status === "confirmed").length})
+                ● {lang === "fr" ? "En attente" : "待接待"} ({pendingBookings.length})
               </div>
-              {bookings.filter(b => b.status === "confirmed").map(b => (
+              {pendingBookings.map(b => (
                 <div key={b.id} style={{ background: "white", borderRadius: 16, padding: 16, marginBottom: 10, border: "2px solid #16a34a", position: "relative" }}>
                   <div style={{ position: "absolute", top: -1, right: 16, background: "#16a34a", color: "white", borderRadius: "0 0 8px 8px", padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
                     {b.type === "surPlace" ? "🍽" : "📦"} {A[b.type] || b.type}
@@ -308,7 +316,7 @@ function AdminPanel() {
                     <span style={{ fontWeight: 700, fontSize: 16 }}>{b.customer_name}</span>
                   </div>
                   <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>
-                    📞 {b.customer_phone} · 🕐 {b.booking_time} · 📅 {b.booking_date}
+                    📞 {b.customer_phone} · 🕐 {isMultiDay ? `${fmt(b.booking_date)} ${b.booking_time}` : b.booking_time}
                   </div>
                   <div style={{ marginBottom: 10 }}>
                     {(b.items || []).map((item, i) => (
@@ -333,18 +341,18 @@ function AdminPanel() {
           )}
 
           {/* Completed/other section */}
-          {bookings.filter(b => b.status !== "confirmed").length > 0 && (
+          {doneBookings.length > 0 && (
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#999", marginBottom: 10 }}>
-                ● {lang === "fr" ? "Traité" : "已处理"} ({bookings.filter(b => b.status !== "confirmed").length})
+                ● {lang === "fr" ? "Traité" : "已处理"} ({doneBookings.length})
               </div>
-              {bookings.filter(b => b.status !== "confirmed").map(b => (
+              {doneBookings.map(b => (
                 <div key={b.id} style={{ background: "#fafafa", borderRadius: 12, padding: 12, marginBottom: 6, border: "1px solid #eee", opacity: 0.7 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: "#999" }}>#{b.booking_code || "?"}</span>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>{b.customer_name}</span>
-                      <span style={{ fontSize: 12, color: "#999" }}>{b.booking_time}</span>
+                      <span style={{ fontSize: 12, color: "#999" }}>{isMultiDay ? `${fmt(b.booking_date)} ${b.booking_time}` : b.booking_time}</span>
                     </div>
                     <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
                       {A[b.status] || b.status}
