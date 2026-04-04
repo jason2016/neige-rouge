@@ -112,6 +112,199 @@ const t = {
   },
 };
 
+const API = "https://mcp.clawshow.ai";
+const NS = "neige-rouge";
+
+const adminT = {
+  fr: {
+    login: "Accès gestion", password: "Mot de passe", enter: "Entrer", wrong: "Mot de passe incorrect",
+    title: "Gestion des commandes", date: "Date", today: "Aujourd'hui", tomorrow: "Demain",
+    total: "Total", bookings: "commandes", surPlace: "Sur place", emporter: "À emporter",
+    items: "Détail produits", arrived: "Arrivé", noShow: "Absent", cancel: "Annuler",
+    confirmed: "Confirmé", completed: "Arrivé", cancelled: "Annulé", no_show: "Absent",
+    noBookings: "Aucune commande pour cette date", refresh: "Actualiser", logout: "Déconnexion",
+    switchLang: "中文",
+  },
+  zh: {
+    login: "管理登录", password: "密码", enter: "进入", wrong: "密码错误",
+    title: "订单管理", date: "日期", today: "今天", tomorrow: "明天",
+    total: "合计", bookings: "订单", surPlace: "堂食", emporter: "外带",
+    items: "菜品明细", arrived: "已到", noShow: "未到", cancel: "取消",
+    confirmed: "已确认", completed: "已到店", cancelled: "已取消", no_show: "未到",
+    noBookings: "该日期无订单", refresh: "刷新", logout: "退出",
+    switchLang: "Français",
+  },
+};
+
+const statusColors = { confirmed: "#16a34a", completed: "#2563eb", cancelled: "#9ca3af", no_show: "#dc2626" };
+
+function AdminPanel() {
+  const [lang, setLang] = useState("fr");
+  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1");
+  const [pwd, setPwd] = useState("");
+  const [pwdErr, setPwdErr] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const A = adminT[lang];
+
+  const fetchBookings = async (d) => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`);
+      const data = await r.json();
+      setBookings(data.bookings || []);
+    } catch { setBookings([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { if (authed) fetchBookings(selectedDate); }, [authed, selectedDate]);
+
+  const updateStatus = async (id, status) => {
+    await fetch(`${API}/api/booking/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ namespace: NS, status }),
+    });
+    fetchBookings(selectedDate);
+  };
+
+  const handleLogin = () => {
+    if (pwd === "neige2025") { localStorage.setItem("nr_admin", "1"); setAuthed(true); setPwdErr(false); }
+    else setPwdErr(true);
+  };
+
+  const today = new Date().toISOString().split("T")[0];
+  const tmr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+  const surPlace = bookings.filter(b => b.type === "surPlace" && b.status !== "cancelled");
+  const emporter = bookings.filter(b => b.type === "emporter" && b.status !== "cancelled");
+  const totalAmt = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + (b.total || 0), 0);
+
+  // Items summary
+  const itemsMap = {};
+  bookings.filter(b => b.status !== "cancelled").forEach(b => {
+    (b.items || []).forEach(i => { itemsMap[i.name] = (itemsMap[i.name] || 0) + (i.qty || 1); });
+  });
+  const itemsSorted = Object.entries(itemsMap).sort((a, b) => b[1] - a[1]);
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <div style={{ background: "white", borderRadius: 16, padding: 32, width: 320, border: "1px solid #eee", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+          <h2 style={{ color: "#8B0000", fontSize: 20, marginBottom: 20 }}>{A.login}</h2>
+          <input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdErr(false); }}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            placeholder={A.password}
+            style={{ width: "100%", padding: "14px", borderRadius: 10, border: pwdErr ? "2px solid #dc2626" : "1px solid #ddd", fontSize: 16, boxSizing: "border-box", marginBottom: 12, outline: "none" }} />
+          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{A.wrong}</div>}
+          <button onClick={handleLogin} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>{A.enter}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+      {/* Admin header */}
+      <div style={{ background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ color: "white", fontSize: 18, fontWeight: 700, margin: 0 }}>🔧 {A.title}</h1>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.switchLang}</button>
+          <button onClick={() => { localStorage.removeItem("nr_admin"); setAuthed(false); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.logout}</button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
+
+        {/* Date selector */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setSelectedDate(today)} style={{ flex: 1, padding: 10, borderRadius: 10, border: selectedDate === today ? "2px solid #8B0000" : "1px solid #ddd", background: selectedDate === today ? "rgba(139,0,0,0.05)" : "white", color: selectedDate === today ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{A.today}</button>
+          <button onClick={() => setSelectedDate(tmr)} style={{ flex: 1, padding: 10, borderRadius: 10, border: selectedDate === tmr ? "2px solid #8B0000" : "1px solid #ddd", background: selectedDate === tmr ? "rgba(139,0,0,0.05)" : "white", color: selectedDate === tmr ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{A.tomorrow}</button>
+          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 13, outline: "none" }} />
+          <button onClick={() => fetchBookings(selectedDate)} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 16 }}>🔄</button>
+        </div>
+
+        {/* Summary cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {[
+            { label: A.bookings, value: bookings.filter(b => b.status !== "cancelled").length, color: "#8B0000" },
+            { label: A.surPlace, value: surPlace.length, color: "#16a34a" },
+            { label: A.emporter, value: emporter.length, color: "#ea580c" },
+            { label: A.total, value: `${totalAmt.toFixed(0)}€`, color: "#8B0000" },
+          ].map((c, i) => (
+            <div key={i} style={{ background: "white", borderRadius: 12, padding: "12px 8px", textAlign: "center", border: "1px solid #eee" }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
+              <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{c.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Items summary */}
+        {itemsSorted.length > 0 && (
+          <div style={{ background: "white", borderRadius: 12, padding: "12px 16px", marginBottom: 16, border: "1px solid #eee" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#8B0000", marginBottom: 8 }}>{A.items}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {itemsSorted.map(([name, qty]) => (
+                <span key={name} style={{ background: "#faf8f5", border: "1px solid #eee", borderRadius: 8, padding: "4px 10px", fontSize: 13 }}>
+                  {name} <strong style={{ color: "#8B0000" }}>×{qty}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Booking list */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+        ) : bookings.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>{A.noBookings}</div>
+        ) : (
+          bookings.map(b => (
+            <div key={b.id} style={{ background: "white", borderRadius: 14, padding: 16, marginBottom: 10, border: "1px solid #eee" }}>
+              {/* Header row */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>{b.customer_name}</span>
+                  <span style={{ color: "#999", marginLeft: 8, fontSize: 13 }}>{b.customer_phone}</span>
+                </div>
+                <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+                  {A[b.status] || b.status}
+                </span>
+              </div>
+              {/* Details */}
+              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
+                🕐 {b.booking_time} · {b.type === "surPlace" ? `🍽 ${A.surPlace}` : `📦 ${A.emporter}`}
+              </div>
+              {/* Items */}
+              <div style={{ fontSize: 13, marginBottom: 10 }}>
+                {(b.items || []).map((item, i) => (
+                  <span key={i} style={{ marginRight: 8 }}>{item.name} ×{item.qty}</span>
+                ))}
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginLeft: 4 }}>{(b.total || 0).toFixed(2)}€</span>
+              </div>
+              {b.notes && <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontStyle: "italic" }}>📝 {b.notes}</div>}
+              {/* Action buttons */}
+              {b.status === "confirmed" && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#16a34a", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
+                  <button onClick={() => updateStatus(b.id, "no_show")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#dc2626", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✗ {A.noShow}</button>
+                  <button onClick={() => updateStatus(b.id, "cancelled")} style={{ padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#999", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{A.cancel}</button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function ItemRow({ item, lang, qty, onAdd, onRemove }) {
   return (
     <div style={{
@@ -170,6 +363,14 @@ function Section({ title, children }) {
 }
 
 export default function App() {
+  const [isAdmin, setIsAdmin] = useState(() => window.location.hash === "#admin");
+  useEffect(() => {
+    const onHash = () => setIsAdmin(window.location.hash === "#admin");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  if (isAdmin) return <AdminPanel />;
+
   const [lang, setLang] = useState("fr");
   const [cart, setCart] = useState({});
   const [view, setView] = useState("menu");
