@@ -175,6 +175,8 @@ export default function App() {
   const [view, setView] = useState("menu");
   const [form, setForm] = useState({ name: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const T = t[lang];
   const allItems = [...MENU.menus, ...MENU.plats, ...MENU.sandwiches, ...MENU.bubbleTea, ...MENU.carte, ...MENU.boissons, ...MENU.desserts];
@@ -193,10 +195,38 @@ export default function App() {
     if (!form.date) setForm(f => ({ ...f, date: defaultDate }));
   }, []);
 
-  const handleSubmit = () => {
-    if (form.name && form.phone && cartItems.length > 0) {
-      setSubmitted(true);
-      setView("menu");
+  const handleSubmit = async () => {
+    if (!form.name || !form.phone || cartItems.length === 0) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await fetch("https://mcp.clawshow.ai/api/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namespace: "neige-rouge",
+          customer_name: form.name,
+          customer_phone: form.phone,
+          customer_email: "",
+          booking_date: form.date,
+          booking_time: form.time,
+          type: form.type,
+          items: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price })),
+          total: total,
+          notes: form.notes || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSubmitted(true);
+        setView("menu");
+      } else {
+        setSubmitError(data.error || "Erreur lors de la commande");
+      }
+    } catch (err) {
+      setSubmitError(lang === "fr" ? "Erreur de connexion. Réessayez." : "网络错误，请重试。");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -415,14 +445,20 @@ export default function App() {
                     }} />
                   </div>
 
-                  <button onClick={handleSubmit} disabled={!form.name || !form.phone} style={{
+                  {submitError && (
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>
+                      {submitError}
+                    </div>
+                  )}
+
+                  <button onClick={handleSubmit} disabled={!form.name || !form.phone || submitting} style={{
                     padding: "16px", borderRadius: 12, border: "none",
-                    background: form.name && form.phone ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
-                    color: form.name && form.phone ? "white" : "#999",
-                    fontSize: 16, fontWeight: 700, cursor: form.name && form.phone ? "pointer" : "default",
-                    letterSpacing: 0.5, marginTop: 4,
+                    background: form.name && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
+                    color: form.name && form.phone && !submitting ? "white" : "#999",
+                    fontSize: 16, fontWeight: 700, cursor: form.name && form.phone && !submitting ? "pointer" : "default",
+                    letterSpacing: 0.5, marginTop: 4, opacity: submitting ? 0.7 : 1,
                   }}>
-                    {T.order.submit} · {total.toFixed(2)}€
+                    {submitting ? (lang === "fr" ? "Envoi en cours..." : "提交中...") : `${T.order.submit} · ${total.toFixed(2)}€`}
                   </button>
                 </div>
               </>
