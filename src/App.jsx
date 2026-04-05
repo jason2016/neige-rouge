@@ -56,6 +56,7 @@ const t = {
       title: "Votre commande",
       empty: "Votre panier est vide",
       name: "Nom",
+      email: "Email",
       phone: "Téléphone",
       date: "Date de retrait",
       time: "Heure",
@@ -63,7 +64,7 @@ const t = {
       submit: "Passer commande",
       total: "Total",
       success: "Commande envoyée !",
-      successMsg: "Vous recevrez une confirmation par SMS.",
+      successMsg: "Vous recevrez une confirmation par email.",
       back: "Nouvelle commande",
       pickup: "À emporter / Sur place",
       surPlace: "Sur place",
@@ -88,6 +89,7 @@ const t = {
       title: "您的订单",
       empty: "购物车为空",
       name: "姓名",
+      email: "邮箱",
       phone: "电话",
       date: "取餐日期",
       time: "时间",
@@ -95,7 +97,7 @@ const t = {
       submit: "提交订单",
       total: "合计",
       success: "下单成功！",
-      successMsg: "您将收到确认短信。",
+      successMsg: "您将收到确认邮件。",
       back: "再次下单",
       pickup: "堂食 / 外带",
       surPlace: "堂食",
@@ -442,7 +444,7 @@ export default function App() {
   const [lang, setLang] = useState("fr");
   const [cart, setCart] = useState({});
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -466,7 +468,7 @@ export default function App() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!form.name || !form.phone || cartItems.length === 0) return;
+    if (!form.name || !form.email || !form.phone || cartItems.length === 0) return;
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -477,7 +479,7 @@ export default function App() {
           namespace: NS,
           customer_name: form.name,
           customer_phone: form.phone,
-          customer_email: "",
+          customer_email: form.email,
           booking_date: form.date,
           booking_time: form.time,
           type: form.type,
@@ -638,10 +640,10 @@ export default function App() {
                 ))}
               </div>
 
-              {[{ key: "name", type: "text" }, { key: "phone", type: "tel" }].map(({ key, type }) => (
+              {[{ key: "name", type: "text" }, { key: "email", type: "email", placeholder: "votre@email.com" }, { key: "phone", type: "tel" }].map(({ key, type, placeholder }) => (
                 <div key={key}>
                   <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 4, display: "block" }}>{T.order[key]} *</label>
-                  <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{
+                  <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder={placeholder || ""} style={{
                     width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white", fontSize: 16, outline: "none", boxSizing: "border-box",
                   }} />
                 </div>
@@ -677,11 +679,11 @@ export default function App() {
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>{submitError}</div>
               )}
 
-              <button onClick={handleSubmit} disabled={!form.name || !form.phone || submitting} style={{
+              <button onClick={handleSubmit} disabled={!form.name || !form.email || !form.phone || submitting} style={{
                 padding: "16px", borderRadius: 12, border: "none",
-                background: form.name && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
-                color: form.name && form.phone && !submitting ? "white" : "#999",
-                fontSize: 16, fontWeight: 700, cursor: form.name && form.phone && !submitting ? "pointer" : "default",
+                background: form.name && form.email && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
+                color: form.name && form.email && form.phone && !submitting ? "white" : "#999",
+                fontSize: 16, fontWeight: 700, cursor: form.name && form.email && form.phone && !submitting ? "pointer" : "default",
                 opacity: submitting ? 0.7 : 1,
               }}>
                 {submitting ? (lang === "fr" ? "Envoi en cours..." : "提交中...") : `${T.order.submit} · ${total.toFixed(2)}€`}
