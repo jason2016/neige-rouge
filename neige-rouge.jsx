@@ -2,46 +2,52 @@ import { useState, useEffect } from "react";
 
 const MENU = {
   menus: [
-    { id: "A", name: "Menu A", desc: "2 nems légumes + salade d'algue ou omelette nature ou piquante + nouille ou riz", descZh: "2个蔬菜春卷 + 海藻沙拉或煎蛋 + 面或饭", price: 6.80 },
-    { id: "B", name: "Menu B", desc: "2 nems poulet ou salade d'algue + poulet croustillant ou porc caramel ou porc laqué + nouille ou riz", descZh: "2个鸡肉春卷或海藻沙拉 + 脆皮鸡/焦糖猪肉/叉烧 + 面或饭", price: 8.50 },
-    { id: "C", name: "Menu C", desc: "Poulet croustillant + porc caramel ou 2 papillotes de crevette ou porc laqué + nouille ou riz", descZh: "脆皮鸡 + 焦糖猪肉/2个虾卷/叉烧 + 面或饭", price: 9.50 },
-    { id: "D", name: "Menu D", desc: "Poulet croustillant ou porc caramel ou porc laqué + nouille ou riz", descZh: "脆皮鸡或焦糖猪肉或叉烧 + 面或饭", price: 7.20 },
-    { id: "F", name: "Menu F", desc: "3 nems poulet ou 3 raviolis ou 2 papillotes de crevette + nouille ou riz", descZh: "3个鸡肉春卷或3个饺子或2个虾卷 + 面或饭", price: 5.50 },
+    { id: "A", name: "Menu A", desc: "2 Nems légumes + Salade d'algues ou omelette nature/piquant + Nouilles ou riz", descZh: "2个蔬菜春卷 + 海藻沙拉或煎蛋 + 面或饭", price: 7.50 },
+    { id: "B", name: "Menu B", desc: "2 Nems poulet ou salade d'algues + poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "2个鸡肉春卷或海藻沙拉 + 脆皮鸡/焦糖猪肉/叉烧 + 面或饭", price: 10.00 },
+    { id: "C", name: "Menu C", desc: "Poulet croustillant + Porc caramel ou porc laqué ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "脆皮鸡 + 焦糖猪肉/叉烧/2个虾卷 + 面或饭", price: 11.00 },
+    { id: "D", name: "Menu D", desc: "Poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "脆皮鸡或焦糖猪肉或叉烧 + 面或饭", price: 8.00 },
+    { id: "F", name: "Menu F", desc: "3 Nems poulet ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷或3个饺子或2个虾卷 + 面或饭", price: 6.00 },
   ],
   plats: [
-    { id: "bobun-b", name: "Bò Bún Boeuf", desc: "Salade à base de vermicelles de riz, carottes, pousse de soja, concombre, cacahuète, menthe et nems", descZh: "牛肉米粉沙拉", price: 8.50, emoji: "🥩" },
-    { id: "bobun-p", name: "Bò Bún Poulet", desc: "Salade de vermicelles au poulet", descZh: "鸡肉米粉沙拉", price: 8.50, emoji: "🍗" },
-    { id: "bobun-v", name: "Bò Bún Végétarien", desc: "Salade de vermicelles végétarienne", descZh: "素米粉沙拉", price: 8.50, emoji: "🥬" },
-    { id: "loclac", name: "Loc Lac", desc: "Riz tomate, bœuf mariné sauté à la poêle, jus de citron salé et au poivre avec un peu de crudité", descZh: "越式铁板牛肉饭", price: 10.00, emoji: "🔥" },
-    { id: "citron", name: "Poulet Citronnelle", desc: "Riz blanc, radis mariné, sauce nems et poulet citronnelle", descZh: "香茅鸡配白饭", price: 8.00, emoji: "🍋" },
-    { id: "soupe", name: "Soupe de Raviolis", desc: "Soupe de nouilles et de raviolis crevettes", descZh: "虾饺汤面", price: 8.50, emoji: "🥟" },
+    { id: "loclac", name: "Loc Lac", desc: "Œuf +1€", descZh: "越式铁板牛肉饭（加蛋+1€）", price: 12.00, emoji: "🔥" },
+    { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
+    { id: "soupe", name: "Soupe de Raviolis", descZh: "虾饺汤面", price: 10.00, emoji: "🥟" },
+    { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
-  sandwiches: [
-    { id: "sw-v", name: "Sandwich Vietnamien Viande", desc: "Poulet ou porc ou boeuf", descZh: "越南三明治（肉）", price: 5.50 },
-    { id: "sw-vg", name: "Sandwich Vietnamien Végétarien", desc: "Sandwich végétarien", descZh: "越南素三明治", price: 5.50 },
-    { id: "sw-v-bt", name: "Sandwich Viande + Bubble Tea", desc: "Sandwich viande avec bubble tea", descZh: "肉三明治 + 奶茶", price: 9.00 },
-    { id: "sw-vg-bt", name: "Sandwich Végétarien + Bubble Tea", desc: "Sandwich végétarien avec bubble tea", descZh: "素三明治 + 奶茶", price: 9.00 },
+  banhMi: [
+    { id: "bm-poulet", name: "Banh Mi Poulet", descZh: "鸡肉越南法棍", price: 6.00 },
+    { id: "bm-boeuf", name: "Banh Mi Boeuf", descZh: "牛肉越南法棍", price: 6.00 },
+    { id: "bm-veg", name: "Banh Mi Végétarien", descZh: "素越南法棍", price: 6.00 },
+    { id: "bm-special", name: "Banh Mi Poulet Croustillant ou Porc Caramel", descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40 },
+    { id: "bm-bt", name: "Banh Mi + Bubble Tea", descZh: "越南法棍 + 奶茶", price: 10.00 },
   ],
-  bubbleTea: [
-    { id: "bt-lait", name: "Bubble Tea Thé au Lait", desc: "Coco, Mangue, Fraise, Taro", descZh: "奶茶系列：椰子/芒果/草莓/芋头", price: 5.00 },
-    { id: "bt-fruit", name: "Bubble Tea Thé aux Fruits", desc: "Citron, Mangue, Kiwi, Fruit de la passion, Litchi", descZh: "果茶系列：柠檬/芒果/猕猴桃/百香果/荔枝", price: 5.00 },
+  boBun: [
+    { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
+    { id: "bobun-p", name: "Bò Bún Poulet", descZh: "鸡肉米粉沙拉", price: 10.50, emoji: "🍗" },
+    { id: "bobun-v", name: "Bò Bún Végétarien", descZh: "素米粉沙拉", price: 10.50, emoji: "🥬" },
   ],
   carte: [
-    { id: "pap", name: "4 Papillotes Crevette", descZh: "4个虾卷", price: 5.50 },
-    { id: "temp", name: "4 Tempora Crevette", descZh: "4个炸虾天妇罗", price: 5.50 },
-    { id: "nems", name: "2 Nems Poulet ou Légume", descZh: "2个春卷（鸡肉或蔬菜）", price: 1.80 },
-    { id: "rav", name: "2 Raviolis", descZh: "2个饺子", price: 1.80 },
-    { id: "sal", name: "Salade Surimi et Crevette", descZh: "蟹柳虾沙拉", price: 4.50 },
-  ],
-  boissons: [
-    { id: "gaz", name: "Boisson Gazeuse", descZh: "碳酸饮料", price: 1.50 },
-    { id: "jus", name: "Jus de Fruit", descZh: "果汁", price: 2.00 },
-    { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00 },
+    { id: "pap", name: "4 Papillotes de Crevettes", descZh: "4个虾卷", price: 6.50 },
+    { id: "temp", name: "4 Tempura Crevette", descZh: "4个炸虾天妇罗", price: 6.50 },
+    { id: "nems", name: "2 Nems Poulet ou Légumes", descZh: "2个春卷（鸡肉或蔬菜）", price: 2.50 },
+    { id: "rav", name: "2 Raviolis Poulet", descZh: "2个鸡肉饺子", price: 2.50 },
   ],
   desserts: [
-    { id: "coco", name: "1 Boule de Coco", descZh: "椰子球", price: 1.50 },
+    { id: "coco", name: "Boule de Coco", descZh: "椰子球", price: 1.50 },
     { id: "fond", name: "Fondant au Chocolat", descZh: "巧克力熔岩蛋糕", price: 3.00 },
-    { id: "mochi", name: "2 Mochi Glacé", descZh: "2个冰麻薯", price: 3.00 },
+    { id: "mochi", name: "2 Mochis Glacé", descZh: "2个冰麻薯", price: 4.00 },
+  ],
+  boissons: [
+    { id: "coca", name: "Coca Cola 33cl", descZh: "可口可乐 33cl", price: 1.70 },
+    { id: "orangina", name: "Orangina 33cl", descZh: "橙味汽水 33cl", price: 1.70 },
+    { id: "oasis", name: "Oasis 33cl", descZh: "绿洲果汁 33cl", price: 1.70 },
+    { id: "perrier", name: "Perrier 33cl", descZh: "巴黎水 33cl", price: 1.70 },
+    { id: "icetea", name: "Ice Tea 33cl", descZh: "冰红茶 33cl", price: 1.70 },
+    { id: "mangue", name: "Jus de Mangue 25cl", descZh: "芒果汁 25cl", price: 2.00 },
+    { id: "coco-jus", name: "Jus de Coco 25cl", descZh: "椰子汁 25cl", price: 2.00 },
+    { id: "litchi", name: "Jus de Litchi 25cl", descZh: "荔枝汁 25cl", price: 2.00 },
+    { id: "monomoko", name: "Mono Moko 32cl", descZh: "Mono Moko 32cl", price: 2.00 },
+    { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00 },
   ],
 };
 
@@ -51,7 +57,7 @@ const t = {
     subtitle: "Cuisine Vietnamienne Authentique",
     tagline: "红雪 · Depuis 2015",
     nav: { menu: "Carte", order: "Commander", contact: "Contact" },
-    sections: { menus: "Menus", plats: "Plats", sandwiches: "Sandwiches", bubbleTea: "Bubble Tea", carte: "À la Carte", boissons: "Boissons", desserts: "Desserts" },
+    sections: { menus: "Menu Bento", plats: "Plats", banhMi: "Banh Mi", boBun: "Bò Bún", carte: "À la Carte", desserts: "Desserts", boissons: "Boissons" },
     order: {
       title: "Votre commande",
       empty: "Votre panier est vide",
@@ -83,7 +89,7 @@ const t = {
     subtitle: "正宗越南料理",
     tagline: "Neige Rouge · 始于2015",
     nav: { menu: "菜单", order: "下单", contact: "联系" },
-    sections: { menus: "套餐", plats: "主菜", sandwiches: "三明治", bubbleTea: "奶茶", carte: "单点", boissons: "饮品", desserts: "甜点" },
+    sections: { menus: "便当套餐", plats: "主菜", banhMi: "越南法棍", boBun: "米粉沙拉", carte: "单点", desserts: "甜点", boissons: "饮品" },
     order: {
       title: "您的订单",
       empty: "购物车为空",
@@ -177,7 +183,7 @@ export default function App() {
   const [submitted, setSubmitted] = useState(false);
 
   const T = t[lang];
-  const allItems = [...MENU.menus, ...MENU.plats, ...MENU.sandwiches, ...MENU.bubbleTea, ...MENU.carte, ...MENU.boissons, ...MENU.desserts];
+  const allItems = [...MENU.menus, ...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
   const cartItems = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => ({ ...allItems.find(i => i.id === id), qty })).filter(i => i.name);
   const total = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
@@ -294,20 +300,20 @@ export default function App() {
             <Section title={T.sections.plats}>
               {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
             </Section>
-            <Section title={T.sections.sandwiches}>
-              {MENU.sandwiches.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+            <Section title={T.sections.banhMi}>
+              {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
             </Section>
-            <Section title={T.sections.bubbleTea}>
-              {MENU.bubbleTea.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+            <Section title={T.sections.boBun}>
+              {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
             </Section>
             <Section title={T.sections.carte}>
               {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
             </Section>
-            <Section title={T.sections.boissons}>
-              {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
-            </Section>
             <Section title={T.sections.desserts}>
               {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+            </Section>
+            <Section title={T.sections.boissons}>
+              {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
             </Section>
           </>
         )}
