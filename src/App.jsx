@@ -51,6 +51,88 @@ const MENU = {
   ],
 };
 
+// Step config for each bento menu — each step is single-select
+// opts: array of [fr, zh] pairs
+const MENU_OPTIONS = {
+  A: {
+    fixed: [["2 Nems légumes", "2个蔬菜春卷"]],
+    steps: [
+      { key: "side", fr: "Accompagnement", zh: "配菜", opts: [
+        ["Salade d'algues", "海藻沙拉"],
+        ["Omelette nature", "原味煎蛋"],
+        ["Omelette piquant", "辣味煎蛋"],
+      ]},
+      { key: "base", fr: "Base", zh: "主食", opts: [
+        ["Nouilles", "面条"],
+        ["Riz", "米饭"],
+      ]},
+    ],
+  },
+  B: {
+    steps: [
+      { key: "side", fr: "Accompagnement", zh: "配菜", opts: [
+        ["2 Nems poulet", "2个鸡肉春卷"],
+        ["Salade d'algues", "海藻沙拉"],
+      ]},
+      { key: "main", fr: "Plat principal", zh: "主菜", opts: [
+        ["Poulet croustillant", "脆皮鸡"],
+        ["Porc caramel", "焦糖猪肉"],
+        ["Porc laqué", "叉烧"],
+      ]},
+      { key: "base", fr: "Base", zh: "主食", opts: [
+        ["Nouilles", "面条"],
+        ["Riz", "米饭"],
+      ]},
+    ],
+  },
+  C: {
+    fixed: [["Poulet croustillant", "脆皮鸡"]],
+    steps: [
+      { key: "side", fr: "Accompagnement", zh: "配菜", opts: [
+        ["Porc caramel", "焦糖猪肉"],
+        ["Porc laqué", "叉烧"],
+        ["2 Papillotes de crevettes", "2个虾饺"],
+      ]},
+      { key: "base", fr: "Base", zh: "主食", opts: [
+        ["Nouilles", "面条"],
+        ["Riz", "米饭"],
+      ]},
+    ],
+  },
+  D: {
+    steps: [
+      { key: "main", fr: "Plat principal", zh: "主菜", opts: [
+        ["Poulet croustillant", "脆皮鸡"],
+        ["Porc caramel", "焦糖猪肉"],
+        ["Porc laqué", "叉烧"],
+      ]},
+      { key: "base", fr: "Base", zh: "主食", opts: [
+        ["Nouilles", "面条"],
+        ["Riz", "米饭"],
+      ]},
+    ],
+  },
+  F: {
+    steps: [
+      { key: "main", fr: "Plat principal", zh: "主菜", opts: [
+        ["3 Nems poulet", "3个鸡肉春卷"],
+        ["3 Raviolis", "3个饺子"],
+        ["2 Papillotes de crevettes", "2个虾饺"],
+      ]},
+      { key: "base", fr: "Base", zh: "主食", opts: [
+        ["Nouilles", "面条"],
+        ["Riz", "米饭"],
+      ]},
+    ],
+  },
+};
+
+// Format options object for display: { side: {fr,zh}, base: {fr,zh} } → "Salade d'algues, Riz"
+const optStr = (options, lang) => {
+  if (!options) return null;
+  return Object.values(options).map(v => (lang === "zh" ? v.zh : v.fr)).join(", ");
+};
+
 const t = {
   fr: {
     title: "Neige Rouge",
@@ -425,6 +507,120 @@ function ItemRow({ item, lang, qty, onAdd, onRemove }) {
   );
 }
 
+// Bento menu row — opens MenuCustomizer on +, removes last selection on −
+function BentoRow({ item, lang, count, onAdd, onRemoveLast }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(139,0,0,0.08)" }}>
+      <div style={{ flex: 1, minWidth: 0, paddingRight: 12, cursor: "pointer" }} onClick={onAdd}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>{item.name}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#8B0000", fontSize: 14 }}>{item.price.toFixed(2)}€</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: "#888", marginTop: 3, lineHeight: 1.4 }}>
+          {lang === "zh" ? item.descZh : item.desc}
+        </div>
+        <div style={{ fontSize: 12, color: "#8B0000", marginTop: 4, fontWeight: 500 }}>
+          {lang === "zh" ? "点击选择配置 →" : "Personnaliser →"}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {count > 0 && (
+          <>
+            <button onClick={e => { e.stopPropagation(); onRemoveLast(); }} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #ccc", background: "white", color: "#666", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+            <span style={{ width: 24, textAlign: "center", fontWeight: 700, fontSize: 15, color: "#8B0000" }}>{count}</span>
+          </>
+        )}
+        <button onClick={onAdd} style={{ width: 28, height: 28, borderRadius: "50%", border: count > 0 ? "1.5px solid #8B0000" : "1.5px solid #ccc", background: count > 0 ? "#8B0000" : "white", color: count > 0 ? "white" : "#666", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+      </div>
+    </div>
+  );
+}
+
+// Bottom-sheet modal for bento menu customization
+function MenuCustomizer({ item, lang, onConfirm, onClose }) {
+  const config = MENU_OPTIONS[item.id];
+  const steps = config.steps;
+  const [step, setStep] = useState(0);
+  const [selections, setSelections] = useState({});
+  const allDone = steps.every(s => selections[s.key]);
+
+  const pick = (key, opt) => {
+    const newSel = { ...selections, [key]: { fr: opt[0], zh: opt[1] } };
+    setSelections(newSel);
+    if (step < steps.length - 1) setTimeout(() => setStep(s => s + 1), 180);
+  };
+
+  const goToStep = (i) => {
+    const newSel = {};
+    steps.slice(0, i).forEach(s => { if (selections[s.key]) newSel[s.key] = selections[s.key]; });
+    setSelections(newSel);
+    setStep(i);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderRadius: "20px 20px 0 0", padding: "20px 16px 40px", maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{item.name}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginTop: 2 }}>{item.price.toFixed(2)}€</div>
+          </div>
+          <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 20, cursor: "pointer", flexShrink: 0 }}>×</button>
+        </div>
+
+        {config.fixed && config.fixed.map((f, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f9f9f9", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 14, color: "#555" }}>
+            <span style={{ color: "#8B0000", fontWeight: 700 }}>✓</span>
+            <span>{lang === "zh" ? f[1] : f[0]}</span>
+          </div>
+        ))}
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+          {steps.map((s, i) => (
+            <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, cursor: i < step ? "pointer" : "default", background: selections[s.key] ? "#8B0000" : i === step ? "rgba(139,0,0,0.35)" : "#e5e5e5", transition: "background 0.2s" }}
+              onClick={() => i < step && goToStep(i)} />
+          ))}
+        </div>
+
+        {steps.map((s, si) => {
+          if (si > step) return null;
+          const isCurrent = si === step;
+          const sel = selections[s.key];
+          return (
+            <div key={si} style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }}>
+                {si + 1} / {steps.length} · {lang === "zh" ? s.zh : s.fr}
+              </div>
+              {!isCurrent && sel ? (
+                <button onClick={() => goToStep(si)} style={{ padding: "12px 16px", borderRadius: 12, border: "2px solid #8B0000", background: "rgba(139,0,0,0.06)", color: "#8B0000", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                  <span>✓ {lang === "zh" ? sel.zh : sel.fr}</span>
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>{lang === "zh" ? "修改 ↩" : "modifier ↩"}</span>
+                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {s.opts.map(opt => (
+                    <button key={opt[0]} onClick={() => pick(s.key, opt)} style={{ padding: "16px 18px", borderRadius: 12, border: "1.5px solid #e5e5e5", background: "white", color: "#333", fontSize: 16, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                      {lang === "zh" ? opt[1] : opt[0]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {allDone && (
+          <button onClick={() => onConfirm(selections)} style={{ width: "100%", padding: 18, borderRadius: 12, border: "none", background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", color: "white", fontSize: 18, fontWeight: 700, cursor: "pointer" }}>
+            {lang === "zh" ? "加入购物车 +" : "Ajouter au panier +"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }) {
   return (
     <div style={{ marginBottom: 28 }}>
@@ -506,7 +702,9 @@ function LandingPage() {
 
 function OrderPage() {
   const [lang, setLang] = useState("fr");
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState({});               // non-bento: { [id]: qty }
+  const [menuSelections, setMenuSelections] = useState([]); // bento: [{uid, menuId, options}]
+  const [customizerItem, setCustomizerItem] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderType, setOrderType] = useState("dine_in");
   const [submitted, setSubmitted] = useState(false);
@@ -515,16 +713,45 @@ function OrderPage() {
   const [submitError, setSubmitError] = useState("");
 
   const T = t[lang];
-  const allItems = [...MENU.menus, ...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
-  const cartItems = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => ({ ...allItems.find(i => i.id === id), qty })).filter(i => i.name);
-  const total = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
+  const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
 
+  // Non-bento cart handlers
   const add = (id) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
   const remove = (id) => setCart(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
 
+  // Bento cart handlers
+  const bentoCount = (menuId) => menuSelections.filter(s => s.menuId === menuId).length;
+  const openCustomizer = (item) => setCustomizerItem(item);
+  const removeBento = (menuId) => {
+    setMenuSelections(prev => {
+      const idx = prev.map(s => s.menuId).lastIndexOf(menuId);
+      if (idx < 0) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+  };
+  const confirmBento = (selections) => {
+    setMenuSelections(prev => [...prev, {
+      uid: `${customizerItem.id}-${Date.now()}`,
+      menuId: customizerItem.id,
+      options: selections,
+    }]);
+    setCustomizerItem(null);
+  };
+
+  // Combined cart
+  const nonBentoCartItems = Object.entries(cart).filter(([, q]) => q > 0)
+    .map(([id, qty]) => ({ ...flatItems.find(i => i.id === id), qty, options: null }))
+    .filter(i => i.name);
+  const bentoCartItems = menuSelections.map(sel => ({
+    ...MENU.menus.find(m => m.id === sel.menuId),
+    qty: 1, options: sel.options, uid: sel.uid,
+  }));
+  const allCartItems = [...bentoCartItems, ...nonBentoCartItems];
+  const total = allCartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const cartCount = allCartItems.reduce((s, i) => s + i.qty, 0);
+
   const handleSubmit = async () => {
-    if (cartItems.length === 0) return;
+    if (allCartItems.length === 0) return;
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -533,7 +760,12 @@ function OrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           namespace: NS,
-          items: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price })),
+          items: allCartItems.map(i => ({
+            id: i.id, name: i.name, qty: i.qty, price: i.price,
+            options: i.options
+              ? Object.fromEntries(Object.entries(i.options).map(([k, v]) => [k, v.fr]))
+              : null,
+          })),
           order_type: orderType,
           total_amount: total,
         }),
@@ -572,10 +804,13 @@ function OrderPage() {
             </div>
           </div>
           <div style={{ background: "white", borderRadius: 12, padding: 16, margin: "24px auto", textAlign: "left", border: "1px solid #eee", maxWidth: 340 }}>
-            {cartItems.map((item, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14 }}>
-                <span>{item.name} ×{item.qty}</span>
-                <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace" }}>{(item.price * item.qty).toFixed(2)}€</span>
+            {allCartItems.map((item, i) => (
+              <div key={item.uid || i} style={{ padding: "6px 0", fontSize: 14, borderBottom: i < allCartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{item.name} ×{item.qty}</span>
+                  <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace" }}>{(item.price * item.qty).toFixed(2)}€</span>
+                </div>
+                {item.options && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{optStr(item.options, lang)}</div>}
               </div>
             ))}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #eee", fontWeight: 700 }}>
@@ -583,7 +818,7 @@ function OrderPage() {
               <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{total.toFixed(2)}€</span>
             </div>
           </div>
-          <button onClick={() => { setSubmitted(false); setCart({}); setOrderNumber(""); }}
+          <button onClick={() => { setSubmitted(false); setCart({}); setMenuSelections([]); setOrderNumber(""); }}
             style={{ padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             {lang === "fr" ? "Nouvelle commande" : "再来一单"}
           </button>
@@ -615,7 +850,13 @@ function OrderPage() {
       {/* Menu */}
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px 16px 140px" }}>
         <Section title={T.sections.menus}>
-          {MENU.menus.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.menus.map(item => (
+            <BentoRow key={item.id} item={item} lang={lang}
+              count={bentoCount(item.id)}
+              onAdd={() => openCustomizer(item)}
+              onRemoveLast={() => removeBento(item.id)}
+            />
+          ))}
         </Section>
         <Section title={T.sections.plats}>
           {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
@@ -637,6 +878,11 @@ function OrderPage() {
         </Section>
       </div>
 
+      {/* Customizer modal */}
+      {customizerItem && (
+        <MenuCustomizer item={customizerItem} lang={lang} onConfirm={confirmBento} onClose={() => setCustomizerItem(null)} />
+      )}
+
       {/* Confirm modal */}
       {showConfirm && cartCount > 0 && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)" }}
@@ -648,10 +894,16 @@ function OrderPage() {
           }}>
             <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
             <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 16, border: "1px solid #eee" }}>
-              {cartItems.map((item, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < cartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
-                  <div><span style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</span><span style={{ color: "#999", marginLeft: 6 }}>×{item.qty}</span></div>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600 }}>{(item.price * item.qty).toFixed(2)}€</span>
+              {allCartItems.map((item, i) => (
+                <div key={item.uid || i} style={{ padding: "10px 0", borderBottom: i < allCartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</span>
+                      <span style={{ color: "#999", marginLeft: 6 }}>×{item.qty}</span>
+                      {item.options && <div style={{ fontSize: 12, color: "#666", marginTop: 3 }}>{optStr(item.options, lang)}</div>}
+                    </div>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600, flexShrink: 0 }}>{(item.price * item.qty).toFixed(2)}€</span>
+                  </div>
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 8px", borderTop: "2px solid #8B0000" }}>
@@ -876,8 +1128,15 @@ function KitchenPanel() {
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   {items.map((item, i) => (
-                    <div key={i} style={{ fontSize: 24, fontWeight: 700, padding: "6px 0", borderBottom: "1px solid #333" }}>
-                      {item.name} <span style={{ color: "#8B0000" }}>×{item.qty}</span>
+                    <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #333" }}>
+                      <div style={{ fontSize: 24, fontWeight: 700 }}>
+                        {item.name} <span style={{ color: "#8B0000" }}>×{item.qty}</span>
+                      </div>
+                      {item.options && (
+                        <div style={{ fontSize: 16, color: "#aaa", marginTop: 2 }}>
+                          {Object.values(item.options).filter(Boolean).join(" · ")}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
