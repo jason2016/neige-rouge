@@ -726,7 +726,7 @@ function KitchenPanel() {
 
   const playSound = (freq = 880, duration = 0.3) => {
     try {
-      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -835,7 +835,7 @@ function KitchenPanel() {
     );
   }
 
-  const pendingOrders = orders.filter(o => o.status === "pending");
+  const pendingOrders = orders.filter(o => o.status === "pending" || o.status === "preparing");
   const readyOrders = orders.filter(o => o.status === "ready");
 
   return (
