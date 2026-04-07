@@ -65,6 +65,7 @@ const MENU_OPTIONS = {
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
         ["Riz", "米饭"],
+        ["Riz cantonais", "炒饭"],
       ]},
     ],
   },
@@ -82,6 +83,7 @@ const MENU_OPTIONS = {
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
         ["Riz", "米饭"],
+        ["Riz cantonais", "炒饭"],
       ]},
     ],
   },
@@ -96,6 +98,7 @@ const MENU_OPTIONS = {
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
         ["Riz", "米饭"],
+        ["Riz cantonais", "炒饭"],
       ]},
     ],
   },
@@ -109,6 +112,7 @@ const MENU_OPTIONS = {
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
         ["Riz", "米饭"],
+        ["Riz cantonais", "炒饭"],
       ]},
     ],
   },
@@ -122,6 +126,7 @@ const MENU_OPTIONS = {
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
         ["Riz", "米饭"],
+        ["Riz cantonais", "炒饭"],
       ]},
     ],
   },
