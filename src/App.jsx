@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const MENU = {
   menus: [
@@ -438,15 +438,491 @@ function Section({ title, children }) {
   );
 }
 
-export default function App() {
-  const [isAdmin, setIsAdmin] = useState(() => window.location.hash === "#admin");
-  useEffect(() => {
-    const onHash = () => setIsAdmin(window.location.hash === "#admin");
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
-  if (isAdmin) return <AdminPanel />;
+// ---------------------------------------------------------------------------
+// Landing Page
+// ---------------------------------------------------------------------------
 
+function LandingPage() {
+  const [lang, setLang] = useState("fr");
+  const T = t[lang];
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet" />
+      <div style={{
+        background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+        padding: "60px 20px 48px", textAlign: "center", position: "relative",
+      }}>
+        <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{
+          position: "absolute", top: 16, right: 16,
+          background: "rgba(255,255,255,0.15)", border: "none", color: "rgba(255,255,255,0.9)",
+          padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer",
+        }}>{T.switchLang}</button>
+        <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>{T.tagline}</div>
+        <h1 style={{
+          fontFamily: lang === "zh" ? "'Noto Serif SC', serif" : "'Playfair Display', serif",
+          fontSize: lang === "zh" ? 48 : 52, fontWeight: 900, color: "white", margin: 0, lineHeight: 1.1,
+        }}>{T.title}</h1>
+        <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 16, marginTop: 10, fontWeight: 400 }}>{T.subtitle}</p>
+        <div style={{ marginTop: 16, fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
+          {T.info.hours} · ☎ {T.info.phone}
+        </div>
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "40px 20px", gap: 20, maxWidth: 400, margin: "0 auto", width: "100%" }}>
+        <a href="#order" style={{
+          display: "block", width: "100%", padding: "28px 20px", borderRadius: 16,
+          background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+          color: "white", textAlign: "center", textDecoration: "none",
+          fontSize: 20, fontWeight: 700, boxSizing: "border-box",
+        }}>
+          {lang === "fr" ? "Commander sur place" : "到店点餐"}
+          <div style={{ fontSize: 13, fontWeight: 400, opacity: 0.8, marginTop: 6 }}>
+            {lang === "fr" ? "Scannez, commandez, dégustez" : "扫码点餐，即刻享用"}
+          </div>
+        </a>
+        <a href="#menu" style={{
+          display: "block", width: "100%", padding: "28px 20px", borderRadius: 16,
+          background: "white", border: "2px solid #8B0000",
+          color: "#8B0000", textAlign: "center", textDecoration: "none",
+          fontSize: 20, fontWeight: 700, boxSizing: "border-box",
+        }}>
+          {lang === "fr" ? "Réserver à l'avance" : "提前预订"}
+          <div style={{ fontSize: 13, fontWeight: 400, color: "#888", marginTop: 6 }}>
+            {lang === "fr" ? "Commandez pour demain" : "预订明天的餐食"}
+          </div>
+        </a>
+      </div>
+      <div style={{ textAlign: "center", padding: "20px", fontSize: 11, color: "#ccc" }}>
+        7 rue des Ursulines, 75005 Paris
+        <span style={{ margin: "0 6px" }}>·</span>
+        <a href="#admin" style={{ color: "#ddd", textDecoration: "none" }}>Gestion</a>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Order Page (dine-in, simplified — no name/phone/email)
+// ---------------------------------------------------------------------------
+
+function OrderPage() {
+  const [lang, setLang] = useState("fr");
+  const [cart, setCart] = useState({});
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [orderType, setOrderType] = useState("dine_in");
+  const [submitted, setSubmitted] = useState(false);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const T = t[lang];
+  const allItems = [...MENU.menus, ...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
+  const cartItems = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => ({ ...allItems.find(i => i.id === id), qty })).filter(i => i.name);
+  const total = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
+
+  const add = (id) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
+  const remove = (id) => setCart(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
+
+  const handleSubmit = async () => {
+    if (cartItems.length === 0) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await fetch(`${API}/api/order/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namespace: NS,
+          items: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price })),
+          order_type: orderType,
+          total_amount: total,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrderNumber(data.order_number);
+        setSubmitted(true);
+        setShowConfirm(false);
+      } else {
+        setSubmitError(data.error || "Erreur");
+      }
+    } catch {
+      setSubmitError(lang === "fr" ? "Erreur de connexion" : "网络错误");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet" />
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, color: "#8B0000", marginBottom: 8 }}>
+            {lang === "fr" ? "Commande envoyée !" : "下单成功！"}
+          </h2>
+          <div style={{ margin: "20px 0", padding: "20px 32px", background: "white", borderRadius: 16, border: "3px solid #8B0000", display: "inline-block" }}>
+            <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+              {lang === "fr" ? "Votre numéro" : "您的取餐号"}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>{orderNumber}</div>
+            <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+              {lang === "fr" ? "Veuillez patienter, nous préparons votre commande" : "请稍候，我们正在准备您的餐食"}
+            </div>
+          </div>
+          <div style={{ background: "white", borderRadius: 12, padding: 16, margin: "24px auto", textAlign: "left", border: "1px solid #eee", maxWidth: 340 }}>
+            {cartItems.map((item, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14 }}>
+                <span>{item.name} ×{item.qty}</span>
+                <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace" }}>{(item.price * item.qty).toFixed(2)}€</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #eee", fontWeight: 700 }}>
+              <span>Total</span>
+              <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{total.toFixed(2)}€</span>
+            </div>
+          </div>
+          <button onClick={() => { setSubmitted(false); setCart({}); setOrderNumber(""); }}
+            style={{ padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            {lang === "fr" ? "Nouvelle commande" : "再来一单"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet" />
+      {/* Compact header */}
+      <div style={{
+        background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+        padding: "16px 20px", textAlign: "center", position: "relative",
+      }}>
+        <a href="#" style={{ position: "absolute", top: 16, left: 16, color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 14 }}>←</a>
+        <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{
+          position: "absolute", top: 14, right: 16,
+          background: "rgba(255,255,255,0.15)", border: "none", color: "rgba(255,255,255,0.9)",
+          padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>{T.switchLang}</button>
+        <h1 style={{
+          fontFamily: lang === "zh" ? "'Noto Serif SC', serif" : "'Playfair Display', serif",
+          fontSize: 22, fontWeight: 900, color: "white", margin: 0,
+        }}>{lang === "fr" ? "Commander" : "点餐"}</h1>
+      </div>
+
+      {/* Menu */}
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px 16px 140px" }}>
+        <Section title={T.sections.menus}>
+          {MENU.menus.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.plats}>
+          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.banhMi}>
+          {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.boBun}>
+          {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.carte}>
+          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.desserts}>
+          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.boissons}>
+          {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+      </div>
+
+      {/* Confirm modal */}
+      {showConfirm && cartCount > 0 && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowConfirm(false); }}>
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            background: "#faf8f5", borderRadius: "20px 20px 0 0",
+            padding: "24px 16px 32px", maxHeight: "70vh", overflowY: "auto",
+          }}>
+            <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
+            <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 16, border: "1px solid #eee" }}>
+              {cartItems.map((item, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < cartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                  <div><span style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</span><span style={{ color: "#999", marginLeft: 6 }}>×{item.qty}</span></div>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600 }}>{(item.price * item.qty).toFixed(2)}€</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 8px", borderTop: "2px solid #8B0000" }}>
+                <span style={{ fontWeight: 700, fontSize: 16 }}>Total</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {[{ key: "dine_in", fr: "Sur place", zh: "堂食" }, { key: "takeaway", fr: "À emporter", zh: "外带" }].map(opt => (
+                <button key={opt.key} onClick={() => setOrderType(opt.key)} style={{
+                  flex: 1, padding: 14, borderRadius: 10,
+                  border: orderType === opt.key ? "2px solid #8B0000" : "1px solid #ddd",
+                  background: orderType === opt.key ? "rgba(139,0,0,0.05)" : "white",
+                  color: orderType === opt.key ? "#8B0000" : "#999",
+                  fontSize: 16, fontWeight: 700, cursor: "pointer",
+                }}>{lang === "zh" ? opt.zh : opt.fr}</button>
+              ))}
+            </div>
+            {submitError && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14, marginBottom: 12 }}>{submitError}</div>
+            )}
+            <button onClick={handleSubmit} disabled={submitting} style={{
+              width: "100%", padding: 18, borderRadius: 12, border: "none",
+              background: submitting ? "#ddd" : "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+              color: submitting ? "#999" : "white",
+              fontSize: 18, fontWeight: 700, cursor: submitting ? "default" : "pointer",
+            }}>
+              {submitting ? (lang === "fr" ? "Envoi..." : "提交中...") : (lang === "fr" ? "Confirmer la commande" : "确认下单")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating cart bar */}
+      {cartCount > 0 && !showConfirm && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          background: "rgba(250,248,245,0.95)", backdropFilter: "blur(12px)",
+          borderTop: "1px solid #eee", padding: "12px 16px", zIndex: 100,
+        }}>
+          <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#999" }}>{cartCount} {lang === "fr" ? "article(s)" : "件"}</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</div>
+            </div>
+            <button onClick={() => setShowConfirm(true)} style={{
+              background: "#8B0000", color: "white", border: "none",
+              padding: "14px 32px", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer",
+            }}>
+              {lang === "fr" ? "Commander" : "下单"} →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kitchen Panel (full-screen, two columns, sound alerts)
+// ---------------------------------------------------------------------------
+
+function KitchenPanel() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_kitchen") === "1");
+  const [pwd, setPwd] = useState("");
+  const [pwdErr, setPwdErr] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [clock, setClock] = useState("");
+  const orderIdsRef = useRef(new Set());
+  const readyIdsRef = useRef(new Set());
+  const audioCtxRef = useRef(null);
+
+  const playSound = (freq = 880, duration = 0.3) => {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtxRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    } catch {}
+  };
+
+  const playNewOrderSound = () => { playSound(660, 0.15); setTimeout(() => playSound(880, 0.3), 180); };
+  const playReadySound = () => { playSound(523, 0.15); setTimeout(() => playSound(659, 0.15), 180); setTimeout(() => playSound(784, 0.3), 360); };
+
+  // Clock
+  useEffect(() => {
+    const tick = () => { const n = new Date(); setClock(`${n.getHours().toString().padStart(2,"0")}:${n.getMinutes().toString().padStart(2,"0")}:${n.getSeconds().toString().padStart(2,"0")}`); };
+    tick();
+    const i = setInterval(tick, 1000);
+    return () => clearInterval(i);
+  }, []);
+
+  // Polling
+  useEffect(() => {
+    if (!authed) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API}/api/order/queue?namespace=${NS}`);
+        const data = await res.json();
+        const newOrders = data.orders || [];
+
+        // Detect new pending orders
+        const pendingIds = new Set(newOrders.filter(o => o.status === "pending").map(o => o.id));
+        for (const id of pendingIds) {
+          if (!orderIdsRef.current.has(id)) { playNewOrderSound(); break; }
+        }
+        orderIdsRef.current = pendingIds;
+
+        // Detect newly ready orders
+        const readyIds = new Set(newOrders.filter(o => o.status === "ready").map(o => o.id));
+        for (const id of readyIds) {
+          if (!readyIdsRef.current.has(id)) { playReadySound(); break; }
+        }
+        readyIdsRef.current = readyIds;
+
+        // Auto-mark ready orders as picked after 5 min
+        const now = new Date();
+        for (const order of newOrders) {
+          if (order.status === "ready" && order.updated_at) {
+            if (now - new Date(order.updated_at) > 5 * 60 * 1000) {
+              fetch(`${API}/api/order/${order.id}/picked`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ namespace: NS }),
+              }).catch(() => {});
+            }
+          }
+        }
+
+        setOrders(newOrders.filter(o => o.status !== "picked"));
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [authed]);
+
+  const markReady = async (id) => {
+    await fetch(`${API}/api/order/${id}/complete`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ namespace: NS }),
+    });
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: "ready", updated_at: new Date().toISOString() } : o));
+    playReadySound();
+  };
+
+  const markPicked = async (id) => {
+    await fetch(`${API}/api/order/${id}/picked`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ namespace: NS }),
+    });
+    setOrders(prev => prev.filter(o => o.id !== id));
+  };
+
+  const handleLogin = () => {
+    if (pwd === "kitchen2025") { localStorage.setItem("nr_kitchen", "1"); setAuthed(true); setPwdErr(false); }
+    else setPwdErr(true);
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+        <div style={{ background: "#2a2a2a", borderRadius: 16, padding: 32, width: 320, textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>👨‍🍳</div>
+          <h2 style={{ color: "#8B0000", fontSize: 22, marginBottom: 20 }}>Cuisine · 后厨</h2>
+          <input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdErr(false); }}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            placeholder="Mot de passe"
+            style={{ width: "100%", padding: 14, borderRadius: 10, border: pwdErr ? "2px solid #dc2626" : "1px solid #444", background: "#333", color: "white", fontSize: 16, boxSizing: "border-box", marginBottom: 12, outline: "none" }} />
+          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>Mot de passe incorrect</div>}
+          <button onClick={handleLogin} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Entrer</button>
+        </div>
+      </div>
+    );
+  }
+
+  const pendingOrders = orders.filter(o => o.status === "pending");
+  const readyOrders = orders.filter(o => o.status === "ready");
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} } .ready-blink{animation:blink 1.5s ease-in-out infinite}`}</style>
+
+      {/* Top bar */}
+      <div style={{ background: "#8B0000", padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>👨‍🍳 Cuisine · 后厨</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20 }}>{clock}</span>
+          <button onClick={() => { localStorage.removeItem("nr_kitchen"); setAuthed(false); }}
+            style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", padding: "6px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Déconnexion</button>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div style={{ display: "flex", height: "calc(100vh - 56px)", gap: 2 }}>
+        {/* Left: pending */}
+        <div style={{ flex: 1, padding: 20, overflowY: "auto" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: 3, color: "#ff6b6b", marginBottom: 16 }}>
+            En préparation · 待制作 ({pendingOrders.length})
+          </div>
+          {pendingOrders.length === 0 && (
+            <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 20 }}>Aucune commande · 暂无订单</div>
+          )}
+          {pendingOrders.map(order => {
+            const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
+            return (
+              <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: "2px solid #8B0000" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000" }}>{order.order_number}</span>
+                  <span style={{ fontSize: 14, color: "#888" }}>
+                    {order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}
+                    <span style={{ marginLeft: 10 }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                  </span>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  {items.map((item, i) => (
+                    <div key={i} style={{ fontSize: 24, fontWeight: 700, padding: "6px 0", borderBottom: "1px solid #333" }}>
+                      {item.name} <span style={{ color: "#8B0000" }}>×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => markReady(order.id)} style={{
+                  width: "100%", padding: 18, borderRadius: 12, border: "none",
+                  background: "#16a34a", color: "white", fontSize: 22, fontWeight: 700, cursor: "pointer",
+                }}>✓ Terminé · 完成</button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right: ready for pickup */}
+        <div style={{ flex: 1, padding: 20, overflowY: "auto", background: "#111" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: 3, color: "#fbbf24", marginBottom: 16 }}>
+            Prêt · 请取餐 ({readyOrders.length})
+          </div>
+          {readyOrders.length === 0 && (
+            <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 20 }}>—</div>
+          )}
+          {readyOrders.map(order => (
+            <div key={order.id} className="ready-blink" onClick={() => markPicked(order.id)} style={{
+              background: "linear-gradient(135deg, #8B0000, #5c0000)", borderRadius: 16, padding: 24, marginBottom: 16,
+              textAlign: "center", cursor: "pointer",
+            }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 64, fontWeight: 700, color: "white" }}>{order.order_number}</div>
+              <div style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", marginTop: 8 }}>
+                {order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}
+              </div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 8 }}>
+                Cliquer quand récupéré · 取餐后点击
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Menu Page (reservation/booking — existing functionality)
+// ---------------------------------------------------------------------------
+
+function MenuPage() {
   const [lang, setLang] = useState("fr");
   const [cart, setCart] = useState({});
   const [showForm, setShowForm] = useState(false);
@@ -542,7 +1018,7 @@ export default function App() {
               <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{total.toFixed(2)}€</span>
             </div>
           </div>
-          <button onClick={() => { setSubmitted(false); setCart({}); setForm({ name: "", phone: "", date: defaultDate, time: "12:00", notes: "", type: "surPlace" }); }}
+          <button onClick={() => { setSubmitted(false); setCart({}); setForm({ name: "", email: "", phone: "", date: defaultDate, time: "12:00", notes: "", type: "surPlace" }); }}
             style={{ padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             {T.order.back}
           </button>
@@ -560,6 +1036,7 @@ export default function App() {
         background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
         padding: "32px 20px 28px", textAlign: "center", position: "relative",
       }}>
+        <a href="#" style={{ position: "absolute", top: 16, left: 16, color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 14 }}>←</a>
         <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{
           position: "absolute", top: 16, right: 16,
           background: "rgba(255,255,255,0.15)", border: "none", color: "rgba(255,255,255,0.9)",
@@ -577,7 +1054,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Menu — single page, no tabs */}
+      {/* Menu */}
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 16px 120px" }}>
         <Section title={T.sections.menus}>
           {MENU.menus.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
@@ -615,7 +1092,6 @@ export default function App() {
           }}>
             <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
 
-            {/* Cart summary */}
             <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 16, border: "1px solid #eee" }}>
               {cartItems.map((item, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < cartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
@@ -632,7 +1108,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Form fields */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", gap: 8 }}>
                 {["surPlace", "emporter"].map(type => (
@@ -699,7 +1174,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating cart bar — always visible when items in cart */}
+      {/* Floating cart bar */}
       {cartCount > 0 && !showForm && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
@@ -721,12 +1196,30 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer with discrete admin link */}
       <div style={{ textAlign: "center", padding: "20px", fontSize: 11, color: "#ccc" }}>
-        Powered by ClawShow · neigerouge.fr
+        <a href="#" style={{ color: "#ccc", textDecoration: "none" }}>← {lang === "fr" ? "Accueil" : "首页"}</a>
         <span style={{ margin: "0 6px" }}>·</span>
         <a href="#admin" style={{ color: "#ddd", textDecoration: "none" }}>Gestion</a>
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+
+export default function App() {
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "");
+  useEffect(() => {
+    const onHash = () => setRoute(window.location.hash.slice(1) || "");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  if (route === "admin") return <AdminPanel />;
+  if (route === "kitchen") return <KitchenPanel />;
+  if (route === "order") return <OrderPage />;
+  if (route === "menu") return <MenuPage />;
+  return <LandingPage />;
 }
