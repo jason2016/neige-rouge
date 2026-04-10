@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import InstallPrompt from "./components/InstallPrompt";
 
 const MENU = {
   menus: [
@@ -210,6 +211,16 @@ const t = {
 const API = "https://mcp.clawshow.ai";
 const NS = "neige-rouge";
 
+const RESTAURANT_INFO = {
+  name: "NEIGE ROUGE 红雪",
+  subtitle: "Cuisine Vietnamienne Authentique",
+  address: "75 Rue Buffon, 75005 Paris",
+  phone: "01 72 60 48 89",
+  siret: "82207280700016",
+  tva_dine_in: 0.10,
+  tva_takeaway: 0.055,
+};
+
 const adminT = {
   fr: {
     login: "Accès gestion", password: "Mot de passe", enter: "Entrer", wrong: "Mot de passe incorrect",
@@ -241,8 +252,277 @@ function getDatesInRange(from, to) {
   return dates;
 }
 
+// ---------------------------------------------------------------------------
+// Ticket & Facture print helpers
+// ---------------------------------------------------------------------------
+
+function printWindow(htmlContent) {
+  const w = window.open("", "_blank", "width=420,height=600");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Impression</title>
+<style>
+  body { font-family: 'Courier New', monospace; font-size: 13px; margin: 0; padding: 16px; background: white; color: #000; }
+  @media print { body { padding: 0; } .no-print { display: none; } }
+  .btn { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #8B0000; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+</style></head><body>${htmlContent}<button class="btn no-print" onclick="window.print()">🖨 Imprimer</button></body></html>`);
+  w.document.close();
+}
+
+function openTicket(order) {
+  const dt = new Date(order.created_at);
+  const dateStr = `${dt.getDate().toString().padStart(2,"0")}/${(dt.getMonth()+1).toString().padStart(2,"0")}/${dt.getFullYear()}`;
+  const timeStr = `${dt.getHours().toString().padStart(2,"0")}:${dt.getMinutes().toString().padStart(2,"0")}`;
+  const typeStr = order.order_type === "dine_in" ? "Sur place" : "À emporter";
+  const pmLabels = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces" };
+  const payStr = order.payment_status === "paid" ? (pmLabels[order.payment_method] || "Carte (Stancer)") : "Non payé";
+
+  let lines = "";
+  for (const item of (order.items || [])) {
+    const subtotal = ((item.price || 0) * (item.qty || 1)).toFixed(2);
+    const namePart = `${item.name} ×${item.qty}`;
+    lines += `  ${namePart.padEnd(20)}${subtotal.padStart(8)}€\n`;
+    if (item.options) {
+      for (const v of Object.values(item.options)) {
+        lines += `    ${v}\n`;
+      }
+    }
+  }
+
+  const total = (order.total_amount || 0).toFixed(2);
+  const content = `<pre>================================
+       ${RESTAURANT_INFO.name}
+  ${RESTAURANT_INFO.subtitle}
+  ${RESTAURANT_INFO.address}
+  Tél: ${RESTAURANT_INFO.phone}
+  SIRET: ${RESTAURANT_INFO.siret}
+================================
+  Date: ${dateStr}  ${timeStr}
+  Commande: ${order.order_number}
+  Type: ${typeStr}
+--------------------------------
+${lines}--------------------------------
+  ${"TOTAL".padEnd(20)}${total.padStart(8)}€
+  Paiement: ${payStr}
+================================
+     Merci de votre visite !
+================================</pre>`;
+  printWindow(content);
+}
+
+function openFacture(order) {
+  const dt = new Date(order.created_at);
+  const dateStr = `${dt.getDate().toString().padStart(2,"0")}/${(dt.getMonth()+1).toString().padStart(2,"0")}/${dt.getFullYear()}`;
+  const mmdd = `${(dt.getMonth()+1).toString().padStart(2,"0")}${dt.getDate().toString().padStart(2,"0")}`;
+  const invoiceNum = `F${dt.getFullYear()}-${mmdd}-${order.order_number}`;
+  const tvaRate = order.order_type === "takeaway" ? RESTAURANT_INFO.tva_takeaway : RESTAURANT_INFO.tva_dine_in;
+  const tvaLabel = order.order_type === "takeaway" ? "5,5%" : "10%";
+  const ttc = order.total_amount || 0;
+  const ht = ttc / (1 + tvaRate);
+  const tva = ttc - ht;
+  const pmLabelsF = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces" };
+  const payStr = order.payment_status === "paid" ? (pmLabelsF[order.payment_method] || "Carte bancaire") : "Non payé";
+
+  let lines = "";
+  for (const item of (order.items || [])) {
+    const subtotal = ((item.price || 0) * (item.qty || 1)).toFixed(2);
+    const namePart = item.name.substring(0, 22);
+    lines += `${namePart.padEnd(22)} ${String(item.qty).padStart(3)}  ${subtotal.padStart(8)}€\n`;
+    if (item.options) {
+      for (const v of Object.values(item.options)) {
+        lines += `  ${v}\n`;
+      }
+    }
+  }
+
+  const content = `<pre>         FACTURE SIMPLIFIÉE
+         N° ${invoiceNum}
+
+${RESTAURANT_INFO.name}
+${RESTAURANT_INFO.address}
+SIRET: ${RESTAURANT_INFO.siret}
+Tél: ${RESTAURANT_INFO.phone}
+
+Date: ${dateStr}
+
+${"Désignation".padEnd(22)} Qté      Prix
+---------------------------------
+${lines}---------------------------------
+${"Total HT".padEnd(26)} ${ht.toFixed(2).padStart(8)}€
+${"TVA " + tvaLabel.padEnd(22)} ${tva.toFixed(2).padStart(8)}€
+${"Total TTC".padEnd(26)} ${ttc.toFixed(2).padStart(8)}€
+
+Mode de paiement: ${payStr}
+
+Merci pour votre confiance.</pre>`;
+  printWindow(content);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Commandes Tab
+// ---------------------------------------------------------------------------
+
+function CommandesTab() {
+  const today = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(today);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [confirmAmounts, setConfirmAmounts] = useState({}); // {order_id: amount_str}
+  const [confirming, setConfirming] = useState({}); // {order_id: bool}
+
+  const handleConfirmPayment = async (order) => {
+    const amount = parseFloat(confirmAmounts[order.id] ?? order.total_amount);
+    setConfirming(p => ({ ...p, [order.id]: true }));
+    try {
+      const res = await fetch(`${API}/api/order/${order.id}/confirm-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, payment_method: order.payment_method || "card_counter", amount_received: amount }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, payment_status: "paid" } : o));
+      }
+    } catch {}
+    setConfirming(p => ({ ...p, [order.id]: false }));
+  };
+
+  const fetchOrders = async (d) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch { setOrders([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchOrders(date); }, [date]);
+
+  const paid = orders.filter(o => o.payment_status === "paid");
+  const totalAmt = paid.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const pending = orders.filter(o => o.status === "pending" || o.status === "preparing").length;
+  const done = orders.filter(o => o.status === "ready" || o.status === "picked").length;
+
+  const statusStyle = { pending: { bg: "#fef9c3", color: "#854d0e", label: "En attente" }, preparing: { bg: "#dbeafe", color: "#1e40af", label: "En préparation" }, ready: { bg: "#dcfce7", color: "#166534", label: "Prêt" }, picked: { bg: "#f3f4f6", color: "#6b7280", label: "Récupéré" } };
+  const payStyle = { paid: { bg: "#dcfce7", color: "#166534", label: "Payé" }, unpaid: { bg: "#fee2e2", color: "#991b1b", label: "Impayé" }, pending_counter: { bg: "#fff7ed", color: "#c2410c", label: "💳 待刷卡" }, pending_cash: { bg: "#f0fdf4", color: "#15803d", label: "💶 待现金" } };
+
+  const fmt = (isoStr) => { const d = new Date(isoStr); return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`; };
+
+  return (
+    <div>
+      {/* Date picker */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+        <button onClick={() => setDate(today)} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ddd", background: date === today ? "rgba(139,0,0,0.06)" : "white", color: date === today ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Aujourd'hui</button>
+        <button onClick={() => fetchOrders(date)} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 14 }}>🔄</button>
+      </div>
+
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+        {[
+          { label: "Commandes", value: orders.length, color: "#8B0000" },
+          { label: "Total payé", value: `${totalAmt.toFixed(0)}€`, color: "#16a34a" },
+          { label: "En attente", value: pending, color: "#d97706" },
+          { label: "Terminées", value: done, color: "#6b7280" },
+        ].map((c, i) => (
+          <div key={i} style={{ background: "white", borderRadius: 12, padding: "12px 8px", textAlign: "center", border: "1px solid #eee" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
+            <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Order list */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+      ) : orders.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>Aucune commande ce jour</div>
+      ) : orders.map(order => {
+        const ss = statusStyle[order.status] || { bg: "#f3f4f6", color: "#6b7280", label: order.status };
+        const ps = payStyle[order.payment_status] || payStyle.unpaid;
+        return (
+          <div key={order.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid #eee" }}>
+            {/* Header row */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#8B0000" }}>{order.order_number}</span>
+                <span style={{ fontSize: 12, color: "#999" }}>{fmt(order.created_at)}</span>
+                <span style={{ fontSize: 11, color: "#999" }}>{order.order_type === "dine_in" ? "Sur place" : "À emporter"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <span style={{ background: ps.bg, color: ps.color, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                  {ps.label || order.payment_status}
+                </span>
+                <span style={{ background: ss.bg, color: ss.color, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+                  {ss.label}
+                </span>
+              </div>
+            </div>
+            {/* Items */}
+            <div style={{ marginBottom: 8 }}>
+              {(order.items || []).map((item, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0" }}>
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{item.name}</span>
+                    <span style={{ color: "#999", marginLeft: 4 }}>×{item.qty}</span>
+                    {item.options && (
+                      <span style={{ color: "#888", fontSize: 12, marginLeft: 4 }}>
+                        — {Object.values(item.options).join(", ")}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600 }}>
+                    {((item.price || 0) * (item.qty || 1)).toFixed(2)}€
+                  </span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 6, borderTop: "1px solid #f0f0f0", marginTop: 4 }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 16, color: "#8B0000" }}>
+                  {(order.total_amount || 0).toFixed(2)}€
+                </span>
+              </div>
+            </div>
+            {/* Confirm counter payment */}
+            {(order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
+              <div style={{ background: "#fff7ed", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #fed7aa" }}>
+                <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 700, marginBottom: 8 }}>
+                  {order.payment_status === "pending_counter" ? "💳 Encaisser par carte" : "💶 Encaisser en espèces"}
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#666" }}>Montant reçu :</span>
+                  <input type="number" step="0.01" min="0"
+                    value={confirmAmounts[order.id] ?? order.total_amount.toFixed(2)}
+                    onChange={e => setConfirmAmounts(p => ({ ...p, [order.id]: e.target.value }))}
+                    style={{ width: 80, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, fontWeight: 700, color: "#8B0000", outline: "none" }}
+                  />
+                  <span style={{ fontSize: 13 }}>€</span>
+                  <button onClick={() => handleConfirmPayment(order)} disabled={confirming[order.id]}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: confirming[order.id] ? "#ddd" : "#16a34a", color: "white", fontSize: 13, fontWeight: 700, cursor: confirming[order.id] ? "default" : "pointer" }}>
+                    {confirming[order.id] ? "..." : "✅ Confirmer"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => openTicket(order)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #ddd", background: "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                🧾 Ticket
+              </button>
+              <button onClick={() => openFacture(order)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #ddd", background: "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                📄 Facture
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function AdminPanel() {
   const [lang, setLang] = useState("fr");
+  const [tab, setTab] = useState("reservations");
   const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1");
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
@@ -338,7 +618,25 @@ function AdminPanel() {
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div style={{ display: "flex", borderBottom: "2px solid #eee", background: "white", position: "sticky", top: 0, zIndex: 10 }}>
+        {[
+          { key: "reservations", label: "Réservations 预订" },
+          { key: "commandes", label: "Commandes 订单" },
+        ].map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)} style={{
+            flex: 1, padding: "13px 8px", border: "none", background: "none", cursor: "pointer",
+            fontWeight: 700, fontSize: 13, color: tab === tb.key ? "#8B0000" : "#999",
+            borderBottom: tab === tb.key ? "2px solid #8B0000" : "2px solid transparent",
+            marginBottom: -2, transition: "color 0.15s",
+          }}>{tb.label}</button>
+        ))}
+      </div>
+
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
+
+        {tab === "commandes" && <CommandesTab />}
+        {tab === "reservations" && <>
 
         {/* Date selector — quick buttons */}
         <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
@@ -462,6 +760,7 @@ function AdminPanel() {
             </div>
           )}
         </>)}
+        </>}
       </div>
     </div>
   );
@@ -712,7 +1011,9 @@ function OrderPage() {
   const [customizerItem, setCustomizerItem] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderType, setOrderType] = useState("dine_in");
+  const [paymentMethod, setPaymentMethod] = useState("online");
   const [submitted, setSubmitted] = useState(false);
+  const [submittedMethod, setSubmittedMethod] = useState("online");
   const [orderNumber, setOrderNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -760,7 +1061,8 @@ function OrderPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch(`${API}/api/order/create`, {
+      // Step 1: create the order
+      const orderRes = await fetch(`${API}/api/order/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -773,15 +1075,40 @@ function OrderPage() {
           })),
           order_type: orderType,
           total_amount: total,
+          payment_method: paymentMethod,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        setOrderNumber(data.order_number);
+      const orderData = await orderRes.json();
+      if (!orderData.success) {
+        setSubmitError(orderData.error || "Erreur création commande");
+        return;
+      }
+
+      if (paymentMethod === "online") {
+        // Step 2a: Stancer online payment
+        const amountCents = Math.round(total * 100);
+        const payRes = await fetch(`${API}/api/payment/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            namespace: NS,
+            order_id: orderData.order_id,
+            amount: amountCents,
+            description: `Neige Rouge #${orderData.order_number}`,
+          }),
+        });
+        const payData = await payRes.json();
+        if (!payData.success) {
+          setSubmitError(payData.error || "Erreur paiement");
+          return;
+        }
+        window.location.href = payData.payment_url;
+      } else {
+        // Step 2b: counter payment — show success immediately
+        setSubmittedMethod(paymentMethod);
+        setOrderNumber(orderData.order_number);
         setSubmitted(true);
         setShowConfirm(false);
-      } else {
-        setSubmitError(data.error || "Erreur");
       }
     } catch {
       setSubmitError(lang === "fr" ? "Erreur de connexion" : "网络错误");
@@ -804,9 +1131,23 @@ function OrderPage() {
               {lang === "fr" ? "Votre numéro" : "您的取餐号"}
             </div>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>{orderNumber}</div>
-            <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
-              {lang === "fr" ? "Veuillez patienter, nous préparons votre commande" : "请稍候，我们正在准备您的餐食"}
-            </div>
+            {submittedMethod === "card_counter" && (
+              <div style={{ marginTop: 10, padding: "10px 14px", background: "#fff7ed", borderRadius: 10, border: "1px solid #fdba74" }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>💳</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#c2410c" }}>{lang === "fr" ? "Veuillez payer au comptoir" : "请到柜台刷卡付款"}</div>
+              </div>
+            )}
+            {submittedMethod === "cash" && (
+              <div style={{ marginTop: 10, padding: "10px 14px", background: "#f0fdf4", borderRadius: 10, border: "1px solid #86efac" }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>💶</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#15803d" }}>{lang === "fr" ? "Veuillez payer en espèces au comptoir" : "请到柜台现金付款"}</div>
+              </div>
+            )}
+            {submittedMethod === "online" && (
+              <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+                {lang === "fr" ? "Veuillez patienter, nous préparons votre commande" : "请稍候，我们正在准备您的餐食"}
+              </div>
+            )}
           </div>
           <div style={{ background: "white", borderRadius: 12, padding: 16, margin: "24px auto", textAlign: "left", border: "1px solid #eee", maxWidth: 340 }}>
             {allCartItems.map((item, i) => (
@@ -916,7 +1257,7 @@ function OrderPage() {
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
               {[{ key: "dine_in", fr: "Sur place", zh: "堂食" }, { key: "takeaway", fr: "À emporter", zh: "外带" }].map(opt => (
                 <button key={opt.key} onClick={() => setOrderType(opt.key)} style={{
                   flex: 1, padding: 14, borderRadius: 10,
@@ -925,6 +1266,36 @@ function OrderPage() {
                   color: orderType === opt.key ? "#8B0000" : "#999",
                   fontSize: 16, fontWeight: 700, cursor: "pointer",
                 }}>{lang === "zh" ? opt.zh : opt.fr}</button>
+              ))}
+            </div>
+            {/* Payment method selector */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+              {lang === "fr" ? "Mode de paiement 付款方式" : "付款方式"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+              {[
+                { key: "online", icon: "💳", fr: "Payer en ligne", sub: "Apple Pay / Google Pay / CB", zh: "在线付款", subZh: "Apple Pay / Google Pay / 刷卡" },
+                { key: "card_counter", icon: "💳", fr: "Carte au comptoir", sub: "Payer à la caisse par carte", zh: "到店刷卡", subZh: "到柜台刷卡付款" },
+                { key: "cash", icon: "💶", fr: "Espèces", sub: "Payer à la caisse en espèces", zh: "现金", subZh: "到柜台现金付款" },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => setPaymentMethod(opt.key)} style={{
+                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
+                  border: paymentMethod === opt.key ? "2px solid #8B0000" : "1px solid #ddd",
+                  background: paymentMethod === opt.key ? "rgba(139,0,0,0.04)" : "white",
+                  cursor: "pointer",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>{opt.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: paymentMethod === opt.key ? "#8B0000" : "#333" }}>
+                        {lang === "zh" ? opt.zh : opt.fr}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 1 }}>
+                        {lang === "zh" ? opt.subZh : opt.sub}
+                      </div>
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
             {submitError && (
@@ -1044,7 +1415,7 @@ function KitchenPanel() {
           }
         }
 
-        setOrders(newOrders.filter(o => o.status !== "picked"));
+        setOrders(newOrders.filter(o => o.status !== "picked" && (o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash")));
       } catch {}
     };
     poll();
@@ -1123,14 +1494,20 @@ function KitchenPanel() {
           {pendingOrders.map(order => {
             const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
             return (
-              <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: "2px solid #8B0000" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: order.payment_status === "paid" ? "2px solid #8B0000" : "2px solid #f97316" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000" }}>{order.order_number}</span>
                   <span style={{ fontSize: 14, color: "#888" }}>
                     {order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}
                     <span style={{ marginLeft: 10 }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
                   </span>
                 </div>
+                {order.payment_status === "pending_counter" && (
+                  <div style={{ background: "#431407", color: "#fb923c", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💳 待刷卡 · En attente de paiement carte</div>
+                )}
+                {order.payment_status === "pending_cash" && (
+                  <div style={{ background: "#14532d", color: "#4ade80", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💶 待现金 · En attente de paiement espèces</div>
+                )}
                 <div style={{ marginBottom: 16 }}>
                   {items.map((item, i) => (
                     <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #333" }}>
@@ -1523,20 +1900,120 @@ function MenuPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Payment Success Page
+// ---------------------------------------------------------------------------
+
+function PaymentSuccessPage({ orderId }) {
+  const [lang] = useState("fr");
+  const [status, setStatus] = useState("verifying"); // verifying | paid | failed
+  const [orderNumber, setOrderNumber] = useState("");
+
+  useEffect(() => {
+    if (!orderId) { setStatus("failed"); return; }
+    const verify = async () => {
+      try {
+        const res = await fetch(`${API}/api/payment/verify?namespace=${NS}&order_id=${orderId}`);
+        const data = await res.json();
+        if (data.paid) {
+          setStatus("paid");
+          // Fetch order number from queue
+          try {
+            const qr = await fetch(`${API}/api/order/queue?namespace=${NS}`);
+            const qd = await qr.json();
+            const order = (qd.orders || []).find(o => String(o.id) === String(orderId));
+            if (order) setOrderNumber(order.order_number);
+          } catch {}
+        } else {
+          setStatus("failed");
+        }
+      } catch {
+        setStatus("failed");
+      }
+    };
+    verify();
+  }, [orderId]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <div style={{ textAlign: "center", padding: 40, maxWidth: 400 }}>
+        {status === "verifying" && (
+          <>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: "#8B0000" }}>
+              {lang === "fr" ? "Vérification du paiement..." : "正在验证支付..."}
+            </h2>
+          </>
+        )}
+        {status === "paid" && (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, color: "#8B0000", marginBottom: 8 }}>
+              {lang === "fr" ? "Paiement confirmé !" : "支付成功！"}
+            </h2>
+            {orderNumber && (
+              <div style={{ margin: "20px 0", padding: "20px 32px", background: "white", borderRadius: 16, border: "3px solid #8B0000", display: "inline-block" }}>
+                <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+                  {lang === "fr" ? "Votre numéro" : "您的取餐号"}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>{orderNumber}</div>
+                <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+                  {lang === "fr" ? "Nous préparons votre commande" : "我们正在准备您的餐食"}
+                </div>
+              </div>
+            )}
+            <a href="#order" style={{ display: "inline-block", marginTop: 20, padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+              {lang === "fr" ? "Nouvelle commande" : "再来一单"}
+            </a>
+          </>
+        )}
+        {status === "failed" && (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>❌</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: "#8B0000", marginBottom: 12 }}>
+              {lang === "fr" ? "Paiement non confirmé" : "支付未确认"}
+            </h2>
+            <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>
+              {lang === "fr" ? "Votre paiement n'a pas pu être vérifié. Veuillez réessayer ou contacter le personnel." : "支付未能验证，请重试或联系工作人员。"}
+            </p>
+            <a href="#order" style={{ display: "inline-block", padding: "12px 28px", borderRadius: 10, background: "#8B0000", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+              {lang === "fr" ? "Retour à la commande" : "返回点餐"}
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "");
+  const parseHash = () => {
+    const full = window.location.hash.slice(1) || "";
+    const [path, qs] = full.split("?");
+    return { path, params: new URLSearchParams(qs || "") };
+  };
+  const [routeInfo, setRouteInfo] = useState(parseHash);
   useEffect(() => {
-    const onHash = () => setRoute(window.location.hash.slice(1) || "");
+    const onHash = () => setRouteInfo(parseHash());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  const { path: route, params } = routeInfo;
+  // Kitchen and admin don't need install prompt
   if (route === "admin") return <AdminPanel />;
   if (route === "kitchen") return <KitchenPanel />;
-  if (route === "order") return <OrderPage />;
-  if (route === "menu") return <MenuPage />;
-  return <LandingPage />;
+  return (
+    <>
+      {route === "order" && <OrderPage />}
+      {route === "menu" && <MenuPage />}
+      {route === "payment-success" && <PaymentSuccessPage orderId={params.get("order_id")} />}
+      {route !== "order" && route !== "menu" && route !== "payment-success" && <LandingPage />}
+      <InstallPrompt />
+    </>
+  );
 }

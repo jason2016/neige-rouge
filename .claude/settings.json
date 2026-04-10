@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@51.77.201.82 \"grep -n 'payment_method\\\\|payment_status\\\\|pending' /opt/clawshow-mcp-server/db.py | tail -30\")",
+      "Bash(ssh root@51.77.201.82 \"sed -n '361,379p' /opt/clawshow-mcp-server/db.py\")",
+      "Bash(scp /tmp/patch_backend_counter.py root@51.77.201.82:/tmp/patch_backend_counter.py)",
+      "Bash(ssh root@51.77.201.82 \"python3 /tmp/patch_backend_counter.py\")",
+      "Bash(scp /tmp/patch_server_counter.py root@51.77.201.82:/tmp/patch_server_counter.py)",
+      "Bash(ssh root@51.77.201.82 \"python3 /tmp/patch_server_counter.py && python3 -m py_compile /opt/clawshow-mcp-server/server.py && python3 -m py_compile /opt/clawshow-mcp-server/db.py && echo OK\")",
+      "Bash(ssh root@51.77.201.82 \"systemctl restart clawshow-mcp && sleep 2 && systemctl is-active clawshow-mcp\")"
+    ]
+  }
+}
