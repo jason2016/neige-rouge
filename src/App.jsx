@@ -211,6 +211,8 @@ const t = {
 const API = "https://mcp.clawshow.ai";
 const NS = "neige-rouge";
 
+const LOGO_URL = "https://focusingpro.s3.amazonaws.com/FutuShow/system/images/sYtqj14lsLGv.png";
+
 const RESTAURANT_INFO = {
   name: "NEIGE ROUGE 红雪",
   subtitle: "Cuisine Vietnamienne Authentique",
@@ -957,6 +959,7 @@ function LandingPage() {
           background: "rgba(255,255,255,0.15)", border: "none", color: "rgba(255,255,255,0.9)",
           padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer",
         }}>{T.switchLang}</button>
+        <img src={LOGO_URL} alt="Neige Rouge 红雪" style={{ maxWidth: 200, display: "block", margin: "0 auto 20px" }} />
         <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>{T.tagline}</div>
         <h1 style={{
           fontFamily: lang === "zh" ? "'Noto Serif SC', serif" : "'Playfair Display', serif",
