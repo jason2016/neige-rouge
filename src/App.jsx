@@ -230,7 +230,7 @@ const adminT = {
     thisWeek: "Semaine", thisMonth: "Mois", from: "Du", to: "Au",
     total: "Total", bookings: "commandes", surPlace: "Sur place", emporter: "À emporter",
     items: "Détail produits", arrived: "Arrivé", noShow: "Absent", cancel: "Annuler",
-    confirmed: "Confirmé", completed: "Arrivé", cancelled: "Annulé", no_show: "Absent",
+    confirmed: "Confirmé", arrived_status: "Arrivé", completed: "Terminé", cancelled: "Annulé", no_show: "Absent",
     noBookings: "Aucune commande pour cette date", refresh: "Actualiser", logout: "Déconnexion",
     switchLang: "中文",
   },
@@ -240,13 +240,13 @@ const adminT = {
     thisWeek: "本周", thisMonth: "本月", from: "从", to: "至",
     total: "合计", bookings: "订单", surPlace: "堂食", emporter: "外带",
     items: "菜品明细", arrived: "已到", noShow: "未到", cancel: "取消",
-    confirmed: "已确认", completed: "已到店", cancelled: "已取消", no_show: "未到",
+    confirmed: "已确认", arrived_status: "已到店", completed: "已完成", cancelled: "已取消", no_show: "未到",
     noBookings: "该日期无订单", refresh: "刷新", logout: "退出",
     switchLang: "Français",
   },
 };
 
-const statusColors = { confirmed: "#16a34a", completed: "#2563eb", cancelled: "#9ca3af", no_show: "#dc2626" };
+const statusColors = { confirmed: "#16a34a", arrived: "#1d4ed8", completed: "#6b7280", cancelled: "#9ca3af", no_show: "#dc2626" };
 
 function getDatesInRange(from, to) {
   const dates = []; const d = new Date(from);
@@ -432,6 +432,7 @@ function CommandesTab() {
   const [confirmAmounts, setConfirmAmounts] = useState({}); // {order_id: amount_str}
   const [confirming, setConfirming] = useState({}); // {order_id: bool}
   const [invoiceOrder, setInvoiceOrder] = useState(null);
+  const [checkingOut, setCheckingOut] = useState({}); // {order_id: bool}
 
   const handleConfirmPayment = async (order) => {
     const amount = parseFloat(confirmAmounts[order.id] ?? order.total_amount);
@@ -448,6 +449,30 @@ function CommandesTab() {
       }
     } catch {}
     setConfirming(p => ({ ...p, [order.id]: false }));
+  };
+
+  const handleCheckout = async (order) => {
+    setCheckingOut(p => ({ ...p, [order.id]: true }));
+    try {
+      const res = await fetch(`${API}/api/neige-rouge/orders/${order.id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.payment_url) {
+          window.open(data.payment_url, "_blank");
+        } else {
+          // deposit covered everything
+          setOrders(prev => prev.map(o => o.id === order.id ? { ...o, payment_status: "paid" } : o));
+          fetchOrders(date);
+        }
+      } else {
+        alert(data.error || "Erreur checkout");
+      }
+    } catch { alert("Erreur connexion"); }
+    setCheckingOut(p => ({ ...p, [order.id]: false }));
   };
 
   const fetchOrders = async (d) => {
@@ -505,8 +530,19 @@ function CommandesTab() {
       ) : orders.map(order => {
         const ss = statusStyle[order.status] || { bg: "#f3f4f6", color: "#6b7280", label: order.status };
         const ps = payStyle[order.payment_status] || payStyle.unpaid;
+        const isReservation = order.order_source === "reservation";
+        const deposit = parseFloat(order.deposit_applied || 0);
+        const amountDue = isReservation && deposit > 0 ? Math.max(0, (order.total_amount || 0) - deposit) : null;
         return (
-          <div key={order.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid #eee" }}>
+          <div key={order.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 10, border: isReservation ? "2px solid #1d4ed8" : "1px solid #eee" }}>
+            {/* Reservation badge */}
+            {isReservation && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ background: "#dbeafe", color: "#1d4ed8", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>
+                  🔵 Réservation R-{order.booking_code || "?"} · {order.booking_guests || "?"} pers. · {order.booking_time || ""}
+                </span>
+              </div>
+            )}
             {/* Header row */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -541,14 +577,38 @@ function CommandesTab() {
                   </span>
                 </div>
               ))}
-              <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 6, borderTop: "1px solid #f0f0f0", marginTop: 4 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 16, color: "#8B0000" }}>
-                  {(order.total_amount || 0).toFixed(2)}€
-                </span>
+              <div style={{ borderTop: "1px solid #f0f0f0", marginTop: 4, paddingTop: 6 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 16, color: "#8B0000" }}>
+                    {(order.total_amount || 0).toFixed(2)}€
+                  </span>
+                </div>
+                {isReservation && deposit > 0 && (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "flex-end", fontSize: 12, color: "#1d4ed8", marginTop: 2 }}>
+                      <span>Acompte déduit: −{deposit.toFixed(2)}€</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", fontSize: 14, fontWeight: 700, color: "#16a34a", marginTop: 2 }}>
+                      <span>Reste à payer: {amountDue?.toFixed(2)}€</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-            {/* Confirm counter payment */}
-            {(order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
+            {/* Reservation checkout button */}
+            {isReservation && order.payment_status !== "paid" && (
+              <div style={{ marginBottom: 8 }}>
+                <button onClick={() => handleCheckout(order)} disabled={checkingOut[order.id]}
+                  style={{ width: "100%", padding: "12px 0", borderRadius: 10, border: "none", background: checkingOut[order.id] ? "#ddd" : "#16a34a", color: "white", fontSize: 14, fontWeight: 700, cursor: checkingOut[order.id] ? "default" : "pointer" }}>
+                  {checkingOut[order.id] ? "..." : amountDue !== null && amountDue > 0
+                    ? `💳 Encaisser ${amountDue.toFixed(2)} € (acompte ${deposit.toFixed(2)} € déduit)`
+                    : "✅ Clôturer (acompte couvre tout)"
+                  }
+                </button>
+              </div>
+            )}
+            {/* Confirm counter payment (dine-in only) */}
+            {!isReservation && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
               <div style={{ background: "#fff7ed", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #fed7aa" }}>
                 <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 700, marginBottom: 8 }}>
                   {order.payment_status === "pending_counter" ? "💳 Encaisser par carte" : "💶 Encaisser en espèces"}
@@ -604,6 +664,7 @@ function AdminPanel() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [depositAction, setDepositAction] = useState({}); // {id: "using"|"refunding"}
+  const [toast, setToast] = useState(""); // brief toast message
 
   const A = adminT[lang];
 
@@ -621,12 +682,32 @@ function AdminPanel() {
 
   useEffect(() => { if (authed) fetchRange(dateFrom, dateTo); }, [authed, dateFrom, dateTo]);
 
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
+
   const updateStatus = async (id, status) => {
     await fetch(`${API}/api/booking/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS, status }),
     });
     fetchRange(dateFrom, dateTo);
+  };
+
+  const arriveBooking = async (b) => {
+    try {
+      const res = await fetch(`${API}/api/neige-rouge/bookings/${b.id}/arrive`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ Commande ${data.order_number} créée · Acompte ${data.deposit_applied > 0 ? data.deposit_applied.toFixed(2) + " € déduit" : "non applicable"}`);
+        fetchRange(dateFrom, dateTo);
+      } else {
+        showToast(`❌ Erreur: ${data.error}`);
+      }
+    } catch {
+      showToast("❌ Erreur de connexion");
+    }
   };
 
   const useDeposit = async (b) => {
@@ -686,7 +767,8 @@ function AdminPanel() {
   const monthLabel = monthNames[lang]?.[parseInt(today.slice(5, 7))] || today.slice(5, 7);
 
   const pendingBookings = bookings.filter(b => b.status === "confirmed").sort((a, b) => (a.booking_date + a.booking_time).localeCompare(b.booking_date + b.booking_time));
-  const doneBookings = bookings.filter(b => b.status !== "confirmed").sort((a, b) => (b.booking_date + b.booking_time).localeCompare(a.booking_date + a.booking_time));
+  const arrivedBookings = bookings.filter(b => b.status === "arrived").sort((a, b) => (a.booking_date + a.booking_time).localeCompare(b.booking_date + b.booking_time));
+  const doneBookings = bookings.filter(b => b.status !== "confirmed" && b.status !== "arrived").sort((a, b) => (b.booking_date + b.booking_time).localeCompare(a.booking_date + a.booking_time));
 
   const surPlace = bookings.filter(b => b.type === "surPlace" && b.status !== "cancelled");
   const emporter = bookings.filter(b => b.type === "emporter" && b.status !== "cancelled");
@@ -720,6 +802,13 @@ function AdminPanel() {
   return (
     <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999, background: "#1a1a1a", color: "white", borderRadius: 12, padding: "12px 20px", fontSize: 14, fontWeight: 600, maxWidth: 380, textAlign: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+          {toast}
+        </div>
+      )}
 
       {/* Admin header */}
       <div style={{ background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -865,22 +954,40 @@ function AdminPanel() {
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 2, minWidth: 100, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
+                    <button onClick={() => arriveBooking(b)} style={{ flex: 2, minWidth: 100, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
                     <button onClick={() => updateStatus(b.id, "no_show")} style={{ flex: 1, minWidth: 70, padding: 14, borderRadius: 12, border: "none", background: "#dc2626", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✗ {A.noShow}</button>
-                    <button onClick={() => updateStatus(b.id, "cancelled")} style={{ padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#999", fontSize: 14, cursor: "pointer" }}>✕</button>
+                    <button onClick={() => refundDeposit(b)} disabled={!!depositAction[b.id] || !b.payment_required || b.deposit_payment_status !== "paid"}
+                      style={{ padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 13, cursor: "pointer", opacity: (!b.payment_required || b.deposit_payment_status !== "paid") ? 0.4 : 1 }}>
+                      {depositAction[b.id] === "refunding" ? "..." : "↩️"}
+                    </button>
                   </div>
-                  {b.payment_required && b.deposit_payment_status === "paid" && (
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <button onClick={() => useDeposit(b)} disabled={!!depositAction[b.id]}
-                        style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: depositAction[b.id] ? "#ddd" : "#1e40af", color: "white", fontSize: 13, fontWeight: 700, cursor: depositAction[b.id] ? "default" : "pointer" }}>
-                        {depositAction[b.id] === "using" ? "..." : "✓ Utiliser l'acompte"}
-                      </button>
-                      <button onClick={() => refundDeposit(b)} disabled={!!depositAction[b.id]}
-                        style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: depositAction[b.id] ? "default" : "pointer" }}>
-                        {depositAction[b.id] === "refunding" ? "..." : "↩️ Rembourser"}
-                      </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Arrived section — customer at restaurant, order created */}
+          {arrivedBookings.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#1d4ed8", marginBottom: 10 }}>
+                🔵 {lang === "fr" ? "Arrivé — en cours" : "已到店"} ({arrivedBookings.length})
+              </div>
+              {arrivedBookings.map(b => (
+                <div key={b.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 8, border: "2px solid #1d4ed8" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#1d4ed8" }}>#{b.booking_code || "?"}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{b.customer_name}</span>
+                    <span style={{ fontSize: 12, color: "#999" }}>{b.booking_time} · {b.guests || 1} pers.</span>
+                  </div>
+                  {b.deposit_amount > 0 && (
+                    <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600, marginBottom: 8 }}>
+                      🔵 Acompte {b.deposit_amount?.toFixed(2)} € déduit
                     </div>
                   )}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={() => setTab("commandes")} style={{ flex: 2, minWidth: 100, padding: 12, borderRadius: 10, border: "none", background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📋 Voir la commande</button>
+                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>✅ Terminé</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -901,7 +1008,7 @@ function AdminPanel() {
                       <span style={{ fontSize: 12, color: "#999" }}>{isMultiDay ? `${fmt(b.booking_date)} ${b.booking_time}` : b.booking_time}</span>
                     </div>
                     <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
-                      {A[b.status] || b.status}
+                      {b.status === "arrived" ? (A.arrived_status || "Arrivé") : (A[b.status] || b.status)}
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
@@ -1690,7 +1797,15 @@ function KitchenPanel() {
           }
         }
 
-        setOrders(newOrders.filter(o => o.status !== "picked" && (o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash")));
+        setOrders(newOrders.filter(o => {
+          if (o.status === "picked") return false;
+          // Include reservation orders only if they have items
+          if (o.order_source === "reservation") {
+            const items = typeof o.items === "string" ? JSON.parse(o.items || "[]") : (o.items || []);
+            return items.length > 0;
+          }
+          return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash";
+        }));
       } catch {}
     };
     poll();
@@ -1800,10 +1915,11 @@ function KitchenPanel() {
           {pendingOrders.map(order => {
             const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
             const isPrinted = !!printedMap[order.id];
+            const isReservation = order.order_source === "reservation";
             return (
-              <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: order.payment_status === "paid" ? "2px solid #8B0000" : "2px solid #f97316" }}>
+              <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: isReservation ? "2px solid #1d4ed8" : order.payment_status === "paid" ? "2px solid #8B0000" : "2px solid #f97316" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000" }}>{order.order_number}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: isReservation ? "#1d4ed8" : "#8B0000" }}>{order.order_number}</span>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 14, color: "#888" }}>
                       {order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}
@@ -1814,10 +1930,17 @@ function KitchenPanel() {
                     </div>
                   </div>
                 </div>
-                {order.payment_status === "pending_counter" && (
+                {isReservation && (
+                  <div style={{ background: "#1e3a8a", color: "#93c5fd", borderRadius: 8, padding: "6px 12px", fontSize: 15, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>
+                    🔵 Réservation {order.booking_code ? `R-${order.booking_code}` : ""}
+                    {order.booking_guests ? ` · ${order.booking_guests} pers.` : ""}
+                    {order.booking_time ? ` · ${order.booking_time}` : ""}
+                  </div>
+                )}
+                {!isReservation && order.payment_status === "pending_counter" && (
                   <div style={{ background: "#431407", color: "#fb923c", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💳 待刷卡 · En attente de paiement carte</div>
                 )}
-                {order.payment_status === "pending_cash" && (
+                {!isReservation && order.payment_status === "pending_cash" && (
                   <div style={{ background: "#14532d", color: "#4ade80", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💶 待现金 · En attente de paiement espèces</div>
                 )}
                 <div style={{ marginBottom: 12 }}>
@@ -1986,11 +2109,16 @@ function MenuPage() {
         if (data.payment_url) {
           // Redirect to Stancer deposit payment
           window.location.href = data.payment_url;
+        } else if (data.payment_required && !data.payment_url) {
+          // payment was required but no URL returned — server-side error
+          setSubmitError(lang === "fr" ? "Paiement indisponible. Réessayez ou choisissez 'Réserver sans paiement'." : "支付服务暂时不可用，请选择"普通预订"。");
         } else {
           setBookingCode(data.booking_code || "");
           setSubmitted(true);
           setShowForm(false);
         }
+      } else if (data.error === "payment_unavailable") {
+        setSubmitError(lang === "fr" ? "Paiement indisponible. Réessayez ou choisissez 'Réserver sans paiement'." : "支付服务暂时不可用，请选择"普通预订"。");
       } else {
         setSubmitError(data.error || "Erreur lors de la commande");
       }
