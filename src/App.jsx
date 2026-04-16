@@ -478,22 +478,10 @@ function CommandesTab() {
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
-      // Fetch all orders + completed bookings in parallel
-      const [ordersRes, bookingsRes] = await Promise.all([
-        fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`),
-        fetch(`${API}/api/bookings?namespace=${NS}&date=${d}&status=completed`),
-      ]);
-      const ordersData = await ordersRes.json();
-      const bookingsData = await bookingsRes.json();
-      // Build set of completed booking IDs
-      const completedBookingIds = new Set((bookingsData.bookings || []).map(b => b.id));
-      // Show: all dine_in orders + reservation orders whose booking is Terminé
-      const allOrders = ordersData.orders || [];
-      setOrders(allOrders.filter(o => {
-        if (!o.order_source || o.order_source === "dine_in") return true;
-        if (o.order_source === "reservation") return completedBookingIds.has(o.booking_id);
-        return false;
-      }));
+      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      const data = await res.json();
+      // v2.5.0: show all orders — dine_in and reservation (created by arrive_booking)
+      setOrders(data.orders || []);
     } catch { setOrders([]); }
     setLoading(false);
   };
@@ -676,7 +664,6 @@ function AdminPanel() {
   const [dateTo, setDateTo] = useState(today);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [depositAction, setDepositAction] = useState({}); // {id: "using"|"refunding"}
   const [toast, setToast] = useState(""); // brief toast message
 
   const A = adminT[lang];
@@ -723,45 +710,6 @@ function AdminPanel() {
     }
   };
 
-  const useDeposit = async (b) => {
-    const orderId = prompt(`Utiliser l'acompte de ${b.deposit_amount?.toFixed(2)} € ?\n\nEntrez l'ID de la commande dine-in (laisser vide pour ignorer) :`, "");
-    if (orderId === null) return;
-    setDepositAction(p => ({ ...p, [b.id]: "using" }));
-    try {
-      const res = await fetch(`${API}/api/neige-rouge/bookings/${b.id}/use-deposit`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ namespace: NS, order_id: parseInt(orderId) || 0 }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Acompte de ${data.deposit_used?.toFixed(2)} € utilisé !`);
-        fetchRange(dateFrom, dateTo);
-      } else {
-        alert(`❌ ${data.error}`);
-      }
-    } catch { alert("Erreur réseau"); }
-    setDepositAction(p => ({ ...p, [b.id]: null }));
-  };
-
-  const refundDeposit = async (b) => {
-    if (!confirm(`Rembourser l'acompte de ${b.deposit_amount?.toFixed(2)} € à ${b.customer_name} ?\n\nCette action appelle l'API Stancer pour effectuer le remboursement.`)) return;
-    setDepositAction(p => ({ ...p, [b.id]: "refunding" }));
-    try {
-      const res = await fetch(`${API}/api/neige-rouge/bookings/${b.id}/refund`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ namespace: NS }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Remboursement de ${data.refund_amount?.toFixed(2)} € effectué !`);
-        fetchRange(dateFrom, dateTo);
-      } else {
-        alert(`❌ ${data.error}`);
-      }
-    } catch { alert("Erreur réseau"); }
-    setDepositAction(p => ({ ...p, [b.id]: null }));
-  };
-
   const handleLogin = () => {
     if (pwd === "neige2025") { localStorage.setItem("nr_admin", "1"); setAuthed(true); setPwdErr(false); }
     else setPwdErr(true);
@@ -781,7 +729,6 @@ function AdminPanel() {
 
   const pendingBookings = bookings.filter(b => b.status === "confirmed").sort((a, b) => (a.booking_date + a.booking_time).localeCompare(b.booking_date + b.booking_time));
   const arrivedBookings = bookings.filter(b => b.status === "arrived").sort((a, b) => (a.booking_date + a.booking_time).localeCompare(b.booking_date + b.booking_time));
-  const doneBookings = bookings.filter(b => b.status !== "confirmed" && b.status !== "arrived").sort((a, b) => (b.booking_date + b.booking_time).localeCompare(a.booking_date + a.booking_time));
 
   const surPlace = bookings.filter(b => b.type === "surPlace" && b.status !== "cancelled");
   const emporter = bookings.filter(b => b.type === "emporter" && b.status !== "cancelled");
@@ -944,72 +891,32 @@ function AdminPanel() {
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={() => arriveBooking(b)} style={{ flex: 2, minWidth: 100, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ Client arrivé</button>
-                    <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
-                      style={{ flex: 1, minWidth: 70, padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      📄 Reçu
-                    </a>
+                    <button onClick={() => arriveBooking(b)} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ Client arrivé</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Arrived section — customer at restaurant, order created */}
+          {/* Arrived section — display-only, order managed in Commandes tab */}
           {arrivedBookings.length > 0 && (
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#1d4ed8", marginBottom: 10 }}>
-                🔵 {lang === "fr" ? "Arrivé — en cours" : "已到店"} ({arrivedBookings.length})
+                🔵 {lang === "fr" ? "Arrivé" : "已到店"} ({arrivedBookings.length})
               </div>
               {arrivedBookings.map(b => (
-                <div key={b.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 8, border: "2px solid #1d4ed8" }}>
+                <div key={b.id} style={{ background: "white", borderRadius: 14, padding: 14, marginBottom: 8, border: "2px solid #1d4ed8", opacity: 0.85 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#1d4ed8" }}>#{b.booking_code || "?"}</span>
                     <span style={{ fontWeight: 700, fontSize: 15 }}>{b.customer_name}</span>
                     <span style={{ fontSize: 12, color: "#999" }}>{b.booking_time} · {b.guests || 1} pers.</span>
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 2, minWidth: 100, padding: 12, borderRadius: 10, border: "none", background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✅ Terminé</button>
-                    <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
-                      style={{ flex: 1, minWidth: 70, padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      📄 Reçu
-                    </a>
+                  <div style={{ fontSize: 12, color: "#1d4ed8", marginBottom: 8 }}>
+                    ✅ {lang === "fr" ? "Client en salle — commande dans l'onglet Commandes" : "客人已到店 — 订单在Commandes标签"}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Completed/other section */}
-          {doneBookings.length > 0 && (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#999", marginBottom: 10 }}>
-                ● {lang === "fr" ? "Traité" : "已处理"} ({doneBookings.length})
-              </div>
-              {doneBookings.map(b => (
-                <div key={b.id} style={{ background: "#fafafa", borderRadius: 12, padding: 12, marginBottom: 6, border: "1px solid #eee", opacity: 0.7 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: "#999" }}>#{b.booking_code || "?"}</span>
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>{b.customer_name}</span>
-                      <span style={{ fontSize: 12, color: "#999" }}>{isMultiDay ? `${fmt(b.booking_date)} ${b.booking_time}` : b.booking_time}</span>
-                    </div>
-                    <span style={{ background: statusColors[b.status] || "#999", color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
-                      {b.status === "arrived" ? (A.arrived_status || "Arrivé") : (A[b.status] || b.status)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                    {(b.items || []).map((item, i) => <span key={i} style={{ marginRight: 6 }}>{item.name}×{item.qty}</span>)}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{(b.total || 0).toFixed(2)}€</span>
-                  </div>
-                  {b.status === "completed" && (
-                    <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                      <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
-                        style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #8B0000", background: "rgba(139,0,0,0.05)", color: "#8B0000", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
-                        📄 Reçu
-                      </a>
-                    </div>
-                  )}
+                  <button onClick={() => setTab("commandes")} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #1d4ed8", background: "rgba(29,78,216,0.06)", color: "#1d4ed8", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    → {lang === "fr" ? "Voir les commandes" : "查看订单"}
+                  </button>
                 </div>
               ))}
             </div>
