@@ -1946,7 +1946,13 @@ function MenuPage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!form.name || !form.email || !form.phone || allCartItems.length === 0) return;
+    if (!form.name || !form.email || !form.phone) return;
+    // Deposit bookings: cart optional (securing table now, order on arrival)
+    // Standard bookings: cart required (pre-order)
+    if (!(BOOKING_DEPOSIT_ENABLED && paymentRequired) && allCartItems.length === 0) {
+      setSubmitError(lang === "fr" ? "Veuillez sélectionner au moins un plat." : "请先选择餐点。");
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -2246,11 +2252,11 @@ function MenuPage() {
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>{submitError}</div>
               )}
 
-              <button onClick={handleSubmit} disabled={!form.name || !form.email || !form.phone || submitting} style={{
+              <button onClick={handleSubmit} disabled={!form.name || !form.email || !form.phone || (!(BOOKING_DEPOSIT_ENABLED && paymentRequired) && allCartItems.length === 0) || submitting} style={{
                 padding: "16px", borderRadius: 12, border: "none",
-                background: form.name && form.email && form.phone && !submitting ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
-                color: form.name && form.email && form.phone && !submitting ? "white" : "#999",
-                fontSize: 16, fontWeight: 700, cursor: form.name && form.email && form.phone && !submitting ? "pointer" : "default",
+                background: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
+                color: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "white" : "#999",
+                fontSize: 16, fontWeight: 700, cursor: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "pointer" : "default",
                 opacity: submitting ? 0.7 : 1,
               }}>
                 {submitting
