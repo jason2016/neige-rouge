@@ -1,5 +1,13 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(ssh root@51.77.201.82 \"journalctl -u clawshow-mcp -n 50 --no-pager | grep -i 'payment\\\\|stancer\\\\|error\\\\|500\\\\|502'\")",
+      "Bash(ssh root@51.77.201.82 'python3 -c \" *)",
+      "Read(//opt/clawshow-mcp-server/**)",
+      "Bash(scp -i /c/Users/luqia/.ssh/id_rsa -o StrictHostKeyChecking=no \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py\" \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py\" root@51.77.201.82:/opt/clawshow-mcp-server/)",
+      "Bash(scp -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py\" \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py\" root@51.77.201.82:/opt/clawshow-mcp-server/)",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"systemctl restart clawshow-mcp && sleep 2 && systemctl is-active clawshow-mcp\")"
+    ],
     "additionalDirectories": [
       "c:\\Users\\luqia\\OneDrive\\Development\\Customers\\neige-rouge\\public"
     ]

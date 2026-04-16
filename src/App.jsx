@@ -1345,14 +1345,125 @@ function OrderPage() {
 // Kitchen Panel (full-screen, two columns, sound alerts)
 // ---------------------------------------------------------------------------
 
+function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
+  if (!order) return null;
+  const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+  const payLabel = order.payment_status === "pending_counter" ? "💳 Paiement carte comptoir"
+    : order.payment_status === "pending_cash" ? "💶 Paiement espèces"
+    : "✅ Payé en ligne";
+
+  const ticketHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  @page { size: 80mm auto; margin: 4mm 3mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; font-size: 13px; color: #000; width: 74mm; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .big { font-size: 28px; font-weight: bold; text-align: center; margin: 6px 0; }
+  .divider { border-top: 1px dashed #000; margin: 6px 0; }
+  .item { display: flex; justify-content: space-between; padding: 3px 0; }
+  .item-name { flex: 1; }
+  .item-qty { font-weight: bold; min-width: 28px; text-align: right; }
+  .opt { font-size: 11px; color: #444; padding-left: 8px; }
+  .footer { font-size: 11px; text-align: center; margin-top: 8px; }
+</style></head><body>
+<div class="center bold" style="font-size:15px;">NEIGE ROUGE 红雪</div>
+<div class="center" style="font-size:11px;">75 Rue Buffon, 75005 Paris</div>
+<div class="divider"></div>
+<div class="big">${order.order_number}</div>
+<div class="center" style="margin-bottom:4px;">${order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
+<div class="center" style="font-size:11px;">${new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — Imprimé ${timeStr}</div>
+<div class="divider"></div>
+${items.map(item => `
+<div class="item"><span class="item-name">${item.name}</span><span class="item-qty">×${item.qty}</span></div>
+${item.options ? `<div class="opt">${Object.values(item.options).filter(Boolean).join(" · ")}</div>` : ""}
+`).join("")}
+<div class="divider"></div>
+<div class="center" style="font-size:12px;">${payLabel}</div>
+<div class="center bold" style="font-size:14px; margin-top:4px;">${order.total_amount ? `${parseFloat(order.total_amount).toFixed(2)} €` : ""}</div>
+<div class="footer">Merci de votre visite · 谢谢光临</div>
+</body></html>`;
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=320,height=600");
+    if (!w) return;
+    w.document.write(ticketHtml);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); w.close(); }, 400);
+    onPrint();
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div style={{ background: "#1a1a1a", borderRadius: 20, width: "100%", maxWidth: 400, border: "2px solid #8B0000", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ background: "#8B0000", padding: "14px 20px", textAlign: "center" }}>
+          <div style={{ color: "white", fontWeight: 700, fontSize: 18 }}>🖨️ Nouvelle commande · 新订单</div>
+        </div>
+        {/* Ticket preview */}
+        <div style={{ background: "#fff", margin: 16, borderRadius: 10, padding: "14px 16px", fontFamily: "'Courier New', monospace", fontSize: 13, color: "#000" }}>
+          <div style={{ textAlign: "center", fontWeight: 700, fontSize: 15 }}>NEIGE ROUGE 红雪</div>
+          <div style={{ textAlign: "center", fontSize: 11, color: "#555" }}>75 Rue Buffon, 75005 Paris</div>
+          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
+          <div style={{ textAlign: "center", fontSize: 36, fontWeight: 700, color: "#8B0000", margin: "6px 0" }}>{order.order_number}</div>
+          <div style={{ textAlign: "center", fontSize: 13, marginBottom: 4 }}>{order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
+          <div style={{ textAlign: "center", fontSize: 11, color: "#777" }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""} — Imprimé {timeStr}</div>
+          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
+          {items.map((item, i) => (
+            <div key={i}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                <span>{item.name}</span>
+                <span style={{ fontWeight: 700 }}>×{item.qty}</span>
+              </div>
+              {item.options && (
+                <div style={{ fontSize: 11, color: "#555", paddingLeft: 8 }}>
+                  {Object.values(item.options).filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
+          <div style={{ textAlign: "center", fontSize: 12 }}>{payLabel}</div>
+          {order.total_amount && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 15 }}>{parseFloat(order.total_amount).toFixed(2)} €</div>}
+          <div style={{ textAlign: "center", fontSize: 11, color: "#777", marginTop: 6 }}>Merci de votre visite · 谢谢光临</div>
+        </div>
+        {/* Buttons */}
+        <div style={{ display: "flex", gap: 10, padding: "0 16px 16px" }}>
+          <button onClick={handlePrint} style={{
+            flex: 2, padding: 14, borderRadius: 12, border: "none",
+            background: "#8B0000", color: "white", fontSize: 18, fontWeight: 700, cursor: "pointer",
+          }}>🖨️ Imprimer</button>
+          <button onClick={onSkip} style={{
+            flex: 1, padding: 14, borderRadius: 12, border: "none",
+            background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer",
+          }}>✓ Déjà fait</button>
+          <button onClick={onLater} style={{
+            flex: 1, padding: 14, borderRadius: 12, border: "1px solid #555",
+            background: "transparent", color: "#aaa", fontSize: 15, fontWeight: 700, cursor: "pointer",
+          }}>✕ Plus tard</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function KitchenPanel() {
   const [authed, setAuthed] = useState(() => localStorage.getItem("nr_kitchen") === "1");
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
   const [orders, setOrders] = useState([]);
   const [clock, setClock] = useState("");
+  const [ticketOrder, setTicketOrder] = useState(null);
+  const [printedMap, setPrintedMap] = useState({});
   const orderIdsRef = useRef(new Set());
   const readyIdsRef = useRef(new Set());
+  const printedIdsRef = useRef(new Set());
   const audioCtxRef = useRef(null);
 
   const playSound = (freq = 880, duration = 0.3) => {
@@ -1391,11 +1502,20 @@ function KitchenPanel() {
         const data = await res.json();
         const newOrders = data.orders || [];
 
-        // Detect new pending orders
-        const pendingIds = new Set(newOrders.filter(o => o.status === "pending").map(o => o.id));
-        for (const id of pendingIds) {
-          if (!orderIdsRef.current.has(id)) { playNewOrderSound(); break; }
+        // Detect new pending orders → auto-show ticket modal
+        const pendingOrders = newOrders.filter(o => o.status === "pending");
+        const pendingIds = new Set(pendingOrders.map(o => o.id));
+        let hasNew = false;
+        for (const order of pendingOrders) {
+          if (!orderIdsRef.current.has(order.id)) {
+            hasNew = true;
+            // Show ticket modal for first new order (if none currently shown)
+            if (!printedIdsRef.current.has(order.id)) {
+              setTicketOrder(prev => prev || order);
+            }
+          }
         }
+        if (hasNew) playNewOrderSound();
         orderIdsRef.current = pendingIds;
 
         // Detect newly ready orders
@@ -1443,6 +1563,30 @@ function KitchenPanel() {
     setOrders(prev => prev.filter(o => o.id !== id));
   };
 
+  const markPrinted = async (id) => {
+    const timeStr = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    printedIdsRef.current.add(id);
+    setPrintedMap(prev => ({ ...prev, [id]: timeStr }));
+    fetch(`${API}/api/order/${id}/mark-printed`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ namespace: NS }),
+    }).catch(() => {});
+  };
+
+  const handlePrintAndClose = () => {
+    if (ticketOrder) markPrinted(ticketOrder.id);
+    setTicketOrder(null);
+  };
+
+  const handleSkipAndClose = () => {
+    if (ticketOrder) markPrinted(ticketOrder.id);
+    setTicketOrder(null);
+  };
+
+  const openTicketForOrder = (order) => {
+    setTicketOrder(order);
+  };
+
   const handleLogin = () => {
     if (pwd === "kitchen2025") { localStorage.setItem("nr_kitchen", "1"); setAuthed(true); setPwdErr(false); }
     else setPwdErr(true);
@@ -1474,6 +1618,13 @@ function KitchenPanel() {
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
       <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} } .ready-blink{animation:blink 1.5s ease-in-out infinite}`}</style>
 
+      <KitchenTicketModal
+        order={ticketOrder}
+        onPrint={handlePrintAndClose}
+        onSkip={handleSkipAndClose}
+        onLater={() => setTicketOrder(null)}
+      />
+
       {/* Top bar */}
       <div style={{ background: "#8B0000", padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>👨‍🍳 Cuisine · 后厨</h1>
@@ -1496,14 +1647,20 @@ function KitchenPanel() {
           )}
           {pendingOrders.map(order => {
             const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
+            const isPrinted = !!printedMap[order.id];
             return (
               <div key={order.id} style={{ background: "#2a2a2a", borderRadius: 16, padding: 20, marginBottom: 16, border: order.payment_status === "paid" ? "2px solid #8B0000" : "2px solid #f97316" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000" }}>{order.order_number}</span>
-                  <span style={{ fontSize: 14, color: "#888" }}>
-                    {order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}
-                    <span style={{ marginLeft: 10 }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
-                  </span>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 14, color: "#888" }}>
+                      {order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}
+                      <span style={{ marginLeft: 10 }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                    </div>
+                    <div style={{ fontSize: 12, marginTop: 3, color: isPrinted ? "#4ade80" : "#f97316" }}>
+                      {isPrinted ? `✅ Imprimé à ${printedMap[order.id]}` : "⚠️ Non imprimé"}
+                    </div>
+                  </div>
                 </div>
                 {order.payment_status === "pending_counter" && (
                   <div style={{ background: "#431407", color: "#fb923c", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💳 待刷卡 · En attente de paiement carte</div>
@@ -1511,7 +1668,7 @@ function KitchenPanel() {
                 {order.payment_status === "pending_cash" && (
                   <div style={{ background: "#14532d", color: "#4ade80", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💶 待现金 · En attente de paiement espèces</div>
                 )}
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 12 }}>
                   {items.map((item, i) => (
                     <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #333" }}>
                       <div style={{ fontSize: 24, fontWeight: 700 }}>
@@ -1525,10 +1682,16 @@ function KitchenPanel() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => markReady(order.id)} style={{
-                  width: "100%", padding: 18, borderRadius: 12, border: "none",
-                  background: "#16a34a", color: "white", fontSize: 22, fontWeight: 700, cursor: "pointer",
-                }}>✓ Terminé · 完成</button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => openTicketForOrder(order)} style={{
+                    flex: 1, padding: 14, borderRadius: 12, border: "none",
+                    background: "#374151", color: "white", fontSize: 18, fontWeight: 700, cursor: "pointer",
+                  }}>🖨️</button>
+                  <button onClick={() => markReady(order.id)} style={{
+                    flex: 3, padding: 14, borderRadius: 12, border: "none",
+                    background: "#16a34a", color: "white", fontSize: 20, fontWeight: 700, cursor: "pointer",
+                  }}>✓ Terminé · 完成</button>
+                </div>
               </div>
             );
           })}
