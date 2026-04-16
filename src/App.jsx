@@ -1002,6 +1002,14 @@ function AdminPanel() {
                     {(b.items || []).map((item, i) => <span key={i} style={{ marginRight: 6 }}>{item.name}×{item.qty}</span>)}
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{(b.total || 0).toFixed(2)}€</span>
                   </div>
+                  {b.status === "completed" && (
+                    <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                      <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
+                        style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #8B0000", background: "rgba(139,0,0,0.05)", color: "#8B0000", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                        📄 Reçu
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
