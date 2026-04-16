@@ -478,10 +478,22 @@ function CommandesTab() {
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
-      const data = await res.json();
-      // v2.4.0: Commandes tab only shows dine-in orders, not reservation orders
-      setOrders((data.orders || []).filter(o => !o.order_source || o.order_source === "dine_in"));
+      // Fetch all orders + completed bookings in parallel
+      const [ordersRes, bookingsRes] = await Promise.all([
+        fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`),
+        fetch(`${API}/api/bookings?namespace=${NS}&date=${d}&status=completed`),
+      ]);
+      const ordersData = await ordersRes.json();
+      const bookingsData = await bookingsRes.json();
+      // Build set of completed booking IDs
+      const completedBookingIds = new Set((bookingsData.bookings || []).map(b => b.id));
+      // Show: all dine_in orders + reservation orders whose booking is Terminé
+      const allOrders = ordersData.orders || [];
+      setOrders(allOrders.filter(o => {
+        if (!o.order_source || o.order_source === "dine_in") return true;
+        if (o.order_source === "reservation") return completedBookingIds.has(o.booking_id);
+        return false;
+      }));
     } catch { setOrders([]); }
     setLoading(false);
   };
