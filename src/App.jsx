@@ -2015,12 +2015,13 @@ function MenuPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
   const [guests, setGuests] = useState(2);
-  const [paymentRequired, setPaymentRequired] = useState(true);
+  const [paymentType, setPaymentType] = useState("full"); // 'full' | 'deposit'
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [bookingCode, setBookingCode] = useState("");
-  const depositAmount = BOOKING_DEPOSIT_ENABLED && paymentRequired ? guests * DEPOSIT_PER_PERSON : 0;
+  const depositAmount = guests * DEPOSIT_PER_PERSON;         // option B amount
+  const paymentAmount = paymentType === "full" ? total : depositAmount; // actual charge
 
   const T = t[lang];
   const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
@@ -2070,10 +2071,9 @@ function MenuPage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.phone) return;
-    // Deposit bookings: cart optional (securing table now, order on arrival)
-    // Standard bookings: cart required (pre-order)
-    if (!(BOOKING_DEPOSIT_ENABLED && paymentRequired) && allCartItems.length === 0) {
-      setSubmitError(lang === "fr" ? "Veuillez sélectionner au moins un plat." : "请先选择餐点。");
+    // Full-payment option requires items in cart
+    if (paymentType === "full" && allCartItems.length === 0) {
+      setSubmitError(lang === "fr" ? "Ajoutez des plats pour payer la commande complète." : "请先选择菜品（全款模式）。");
       return;
     }
     setSubmitting(true);
@@ -2091,7 +2091,8 @@ function MenuPage() {
           booking_time: form.time,
           type: form.type,
           guests,
-          payment_required: BOOKING_DEPOSIT_ENABLED && paymentRequired,
+          payment_required: true,
+          payment_type: paymentType,
           deposit_per_person: DEPOSIT_PER_PERSON,
           items: allCartItems.map(i => ({
             id: i.id, name: i.name, qty: i.qty, price: i.price,
@@ -2105,20 +2106,10 @@ function MenuPage() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
-        if (data.payment_url) {
-          // Redirect to Stancer deposit payment
-          window.location.href = data.payment_url;
-        } else if (data.payment_required && !data.payment_url) {
-          // payment was required but no URL returned — server-side error
-          setSubmitError(lang === "fr" ? "Paiement indisponible. Réessayez ou choisissez 'Réserver sans paiement'." : "支付服务暂时不可用，请选择"普通预订"。");
-        } else {
-          setBookingCode(data.booking_code || "");
-          setSubmitted(true);
-          setShowForm(false);
-        }
-      } else if (data.error === "payment_unavailable") {
-        setSubmitError(lang === "fr" ? "Paiement indisponible. Réessayez ou choisissez 'Réserver sans paiement'." : "支付服务暂时不可用，请选择"普通预订"。");
+      if (data.success && data.payment_url) {
+        window.location.href = data.payment_url;
+      } else if (data.error === "payment_unavailable" || (data.success && !data.payment_url)) {
+        setSubmitError(lang === "fr" ? "Paiement indisponible. Réessayez." : "支付服务暂时不可用，请重试。");
       } else {
         setSubmitError(data.error || "Erreur lors de la commande");
       }
@@ -2330,68 +2321,98 @@ function MenuPage() {
                 </div>
               </div>
 
-              {/* Payment choice */}
-              {BOOKING_DEPOSIT_ENABLED && (
-                <div>
-                  <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                    {lang === "fr" ? "Mode de réservation" : "预订方式"}
-                  </label>
-                  {/* Deposit card */}
-                  <div onClick={() => setPaymentRequired(true)} style={{
-                    borderRadius: 12, padding: "14px 16px", marginBottom: 10, cursor: "pointer",
-                    border: paymentRequired ? "2px solid #8B0000" : "1px solid #e5e7eb",
-                    background: paymentRequired ? "rgba(139,0,0,0.04)" : "white",
-                    boxShadow: paymentRequired ? "0 2px 12px rgba(139,0,0,0.12)" : "none",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#8B0000", background: "rgba(139,0,0,0.08)", display: "inline-block", borderRadius: 4, padding: "2px 6px", marginBottom: 6 }}>⭐ RECOMMANDÉ</div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>💳 {lang === "fr" ? "Payer maintenant" : "现在付定金"}</div>
-                        <div style={{ fontSize: 13, color: "#8B0000", fontWeight: 700, marginTop: 3 }}>
-                          {guests} × {DEPOSIT_PER_PERSON} € = {depositAmount} €
+              {/* Payment choice — Option A: full, Option B: deposit */}
+              <div>
+                <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 8, display: "block" }}>
+                  {lang === "fr" ? "Mode de paiement" : "付款方式"}
+                </label>
+
+                {/* Option A — full payment (recommended) */}
+                <div onClick={() => allCartItems.length > 0 && setPaymentType("full")} style={{
+                  borderRadius: 12, padding: "14px 16px", marginBottom: 10,
+                  cursor: allCartItems.length > 0 ? "pointer" : "default",
+                  border: paymentType === "full" ? "2px solid #8B0000" : "1px solid #e5e7eb",
+                  background: paymentType === "full" ? "rgba(139,0,0,0.04)" : allCartItems.length === 0 ? "#f9fafb" : "white",
+                  boxShadow: paymentType === "full" ? "0 2px 12px rgba(139,0,0,0.12)" : "none",
+                  opacity: allCartItems.length === 0 ? 0.55 : 1,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#8B0000", background: "rgba(139,0,0,0.08)", display: "inline-block", borderRadius: 4, padding: "2px 6px", marginBottom: 6 }}>⭐ RECOMMANDÉ</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>💳 {lang === "fr" ? "Payer la commande complète" : "全款预订"}</div>
+                      {allCartItems.length > 0 ? (
+                        <div style={{ fontSize: 14, color: "#8B0000", fontWeight: 700, marginTop: 3 }}>Total : {total.toFixed(2)} €</div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
+                          {lang === "fr" ? "Ajoutez des plats pour activer cette option" : "请先选择菜品"}
                         </div>
-                      </div>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", border: paymentRequired ? "6px solid #8B0000" : "2px solid #ddd", flexShrink: 0, marginTop: 4 }} />
+                      )}
                     </div>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: paymentType === "full" ? "6px solid #8B0000" : "2px solid #ddd", flexShrink: 0, marginTop: 4 }} />
+                  </div>
+                  {allCartItems.length > 0 && (
                     <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 2 }}>
-                      {["✓ Place garantie", "✓ Déductible à l'addition", "✓ Annulation gratuite 24h avant"].map(t => (
-                        <div key={t} style={{ fontSize: 12, color: "#16a34a" }}>{t}</div>
+                      {[
+                        lang === "fr" ? "✓ Place garantie" : "✓ 座位保证",
+                        lang === "fr" ? "✓ Rien à payer à l'arrivée" : "✓ 到店无需再付款",
+                        lang === "fr" ? "✓ Annulation gratuite 24h avant" : "✓ 24小时前免费取消",
+                      ].map(txt => (
+                        <div key={txt} style={{ fontSize: 12, color: "#16a34a" }}>{txt}</div>
                       ))}
                     </div>
-                  </div>
-                  {/* Standard card */}
-                  <div onClick={() => setPaymentRequired(false)} style={{
-                    borderRadius: 12, padding: "14px 16px", cursor: "pointer",
-                    border: !paymentRequired ? "2px solid #6b7280" : "1px solid #e5e7eb",
-                    background: !paymentRequired ? "#f9fafb" : "white",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>📝 {lang === "fr" ? "Réserver sans paiement" : "普通预订"}</div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>{lang === "fr" ? "Réservation standard, sans acompte" : "无需预付款，直接确认"}</div>
+                  )}
+                </div>
+
+                {/* Separator */}
+                <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 12, margin: "4px 0 10px" }}>— {lang === "fr" ? "ou" : "或"} —</div>
+
+                {/* Option B — deposit */}
+                <div onClick={() => setPaymentType("deposit")} style={{
+                  borderRadius: 12, padding: "14px 16px", cursor: "pointer",
+                  border: paymentType === "deposit" ? "2px solid #8B0000" : "1px solid #e5e7eb",
+                  background: paymentType === "deposit" ? "rgba(139,0,0,0.04)" : "white",
+                  boxShadow: paymentType === "deposit" ? "0 2px 12px rgba(139,0,0,0.12)" : "none",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>💳 {lang === "fr" ? "Payer un acompte de garantie" : "付定金预订"}</div>
+                      <div style={{ fontSize: 13, color: "#8B0000", fontWeight: 700, marginTop: 3 }}>
+                        {guests} × {DEPOSIT_PER_PERSON} € = {depositAmount} €
                       </div>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", border: !paymentRequired ? "6px solid #6b7280" : "2px solid #ddd", flexShrink: 0 }} />
                     </div>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: paymentType === "deposit" ? "6px solid #8B0000" : "2px solid #ddd", flexShrink: 0, marginTop: 4 }} />
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 2 }}>
+                    {[
+                      lang === "fr" ? "✓ Place garantie" : "✓ 座位保证",
+                      lang === "fr" ? "✓ Déductible à l'addition" : "✓ 到店结账时抵扣",
+                      lang === "fr" ? "✓ Commandez sur place" : "✓ 到店再点菜",
+                    ].map(txt => (
+                      <div key={txt} style={{ fontSize: 12, color: "#16a34a" }}>{txt}</div>
+                    ))}
                   </div>
                 </div>
-              )}
+              </div>
 
               {submitError && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>{submitError}</div>
               )}
 
-              <button onClick={handleSubmit} disabled={!form.name || !form.email || !form.phone || (!(BOOKING_DEPOSIT_ENABLED && paymentRequired) && allCartItems.length === 0) || submitting} style={{
-                padding: "16px", borderRadius: 12, border: "none",
-                background: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#ddd",
-                color: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "white" : "#999",
-                fontSize: 16, fontWeight: 700, cursor: (form.name && form.email && form.phone && ((BOOKING_DEPOSIT_ENABLED && paymentRequired) || allCartItems.length > 0) && !submitting) ? "pointer" : "default",
-                opacity: submitting ? 0.7 : 1,
-              }}>
+              <button onClick={handleSubmit}
+                disabled={!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting}
+                style={{
+                  padding: "16px", borderRadius: 12, border: "none",
+                  background: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "#ddd" : "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+                  color: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "#999" : "white",
+                  fontSize: 16, fontWeight: 700,
+                  cursor: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "default" : "pointer",
+                  opacity: submitting ? 0.7 : 1, width: "100%",
+                }}>
                 {submitting
                   ? (lang === "fr" ? "Envoi en cours..." : "提交中...")
-                  : BOOKING_DEPOSIT_ENABLED && paymentRequired
-                    ? `💳 Payer ${depositAmount} € et réserver`
-                    : `${T.order.submit} · ${total.toFixed(2)}€`
+                  : paymentType === "full"
+                    ? `💳 Payer ${total.toFixed(2)} € et réserver`
+                    : `💳 Payer ${depositAmount} € d'acompte et réserver`
                 }
               </button>
             </div>
