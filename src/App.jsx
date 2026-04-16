@@ -480,7 +480,8 @@ function CommandesTab() {
     try {
       const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
       const data = await res.json();
-      setOrders(data.orders || []);
+      // v2.4.0: Commandes tab only shows dine-in orders, not reservation orders
+      setOrders((data.orders || []).filter(o => !o.order_source || o.order_source === "dine_in"));
     } catch { setOrders([]); }
     setLoading(false);
   };
@@ -700,7 +701,7 @@ function AdminPanel() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Commande ${data.order_number} créée · Acompte ${data.deposit_applied > 0 ? data.deposit_applied.toFixed(2) + " € déduit" : "non applicable"}`);
+        showToast(`✅ ${data.order_number} en préparation — commande envoyée en cuisine`);
         fetchRange(dateFrom, dateTo);
       } else {
         showToast(`❌ Erreur: ${data.error}`);
@@ -924,42 +925,18 @@ function AdminPanel() {
                     </div>
                   </div>
                   {b.notes && <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontStyle: "italic" }}>📝 {b.notes}</div>}
-                  {/* Deposit badge */}
-                  {b.payment_required ? (
-                    <div style={{ marginBottom: 10 }}>
-                      {b.deposit_payment_status === "paid" && (
-                        <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700, marginRight: 6 }}>
-                          🟢 Acompte payé {b.deposit_amount?.toFixed(2)} €
-                        </span>
-                      )}
-                      {b.deposit_payment_status === "used" && (
-                        <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700, marginRight: 6 }}>
-                          🔵 Acompte utilisé {b.deposit_amount?.toFixed(2)} €
-                        </span>
-                      )}
-                      {b.deposit_payment_status === "refunded" && (
-                        <span style={{ background: "#fef9c3", color: "#854d0e", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>
-                          🟡 Remboursé {b.deposit_amount?.toFixed(2)} €
-                        </span>
-                      )}
-                      {(b.deposit_payment_status === "unpaid" || !b.deposit_payment_status) && b.payment_required && (
-                        <span style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>
-                          🔴 Acompte non payé
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ marginBottom: 10 }}>
-                      <span style={{ background: "#f3f4f6", color: "#6b7280", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>⚪ Standard (sans acompte)</span>
-                    </div>
-                  )}
+                  {/* Payment status */}
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>
+                      🟢 Payé {(b.total || 0).toFixed(2)} €
+                    </span>
+                  </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={() => arriveBooking(b)} style={{ flex: 2, minWidth: 100, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✓ {A.arrived}</button>
-                    <button onClick={() => updateStatus(b.id, "no_show")} style={{ flex: 1, minWidth: 70, padding: 14, borderRadius: 12, border: "none", background: "#dc2626", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✗ {A.noShow}</button>
-                    <button onClick={() => refundDeposit(b)} disabled={!!depositAction[b.id] || !b.payment_required || b.deposit_payment_status !== "paid"}
-                      style={{ padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 13, cursor: "pointer", opacity: (!b.payment_required || b.deposit_payment_status !== "paid") ? 0.4 : 1 }}>
-                      {depositAction[b.id] === "refunding" ? "..." : "↩️"}
-                    </button>
+                    <button onClick={() => arriveBooking(b)} style={{ flex: 2, minWidth: 100, padding: 14, borderRadius: 12, border: "none", background: "#16a34a", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ Client arrivé</button>
+                    <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
+                      style={{ flex: 1, minWidth: 70, padding: 14, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      📄 Reçu
+                    </a>
                   </div>
                 </div>
               ))}
@@ -979,14 +956,12 @@ function AdminPanel() {
                     <span style={{ fontWeight: 700, fontSize: 15 }}>{b.customer_name}</span>
                     <span style={{ fontSize: 12, color: "#999" }}>{b.booking_time} · {b.guests || 1} pers.</span>
                   </div>
-                  {b.deposit_amount > 0 && (
-                    <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600, marginBottom: 8 }}>
-                      🔵 Acompte {b.deposit_amount?.toFixed(2)} € déduit
-                    </div>
-                  )}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={() => setTab("commandes")} style={{ flex: 2, minWidth: 100, padding: 12, borderRadius: 10, border: "none", background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📋 Voir la commande</button>
-                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>✅ Terminé</button>
+                    <button onClick={() => updateStatus(b.id, "completed")} style={{ flex: 2, minWidth: 100, padding: 12, borderRadius: 10, border: "none", background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✅ Terminé</button>
+                    <a href={`${API}/api/neige-rouge/bookings/${b.id}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
+                      style={{ flex: 1, minWidth: 70, padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#6b7280", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      📄 Reçu
+                    </a>
                   </div>
                 </div>
               ))}
@@ -2015,13 +1990,10 @@ function MenuPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", date: "", time: "12:00", notes: "", type: "surPlace" });
   const [guests, setGuests] = useState(2);
-  const [paymentType, setPaymentType] = useState("full"); // 'full' | 'deposit'
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [bookingCode, setBookingCode] = useState("");
-  const depositAmount = guests * DEPOSIT_PER_PERSON;         // option B amount
-  const paymentAmount = paymentType === "full" ? total : depositAmount; // actual charge
 
   const T = t[lang];
   const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
@@ -2071,9 +2043,8 @@ function MenuPage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.phone) return;
-    // Full-payment option requires items in cart
-    if (paymentType === "full" && allCartItems.length === 0) {
-      setSubmitError(lang === "fr" ? "Ajoutez des plats pour payer la commande complète." : "请先选择菜品（全款模式）。");
+    if (allCartItems.length === 0) {
+      setSubmitError(lang === "fr" ? "Veuillez sélectionner vos plats avant de réserver." : "请先选择菜品。");
       return;
     }
     setSubmitting(true);
@@ -2092,8 +2063,7 @@ function MenuPage() {
           type: form.type,
           guests,
           payment_required: true,
-          payment_type: paymentType,
-          deposit_per_person: DEPOSIT_PER_PERSON,
+          payment_type: "full",
           items: allCartItems.map(i => ({
             id: i.id, name: i.name, qty: i.qty, price: i.price,
             ...(i.vat_rate ? { vat_rate: i.vat_rate } : {}),
@@ -2321,98 +2291,29 @@ function MenuPage() {
                 </div>
               </div>
 
-              {/* Payment choice — Option A: full, Option B: deposit */}
-              <div>
-                <label style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#999", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                  {lang === "fr" ? "Mode de paiement" : "付款方式"}
-                </label>
-
-                {/* Option A — full payment (recommended) */}
-                <div onClick={() => allCartItems.length > 0 && setPaymentType("full")} style={{
-                  borderRadius: 12, padding: "14px 16px", marginBottom: 10,
-                  cursor: allCartItems.length > 0 ? "pointer" : "default",
-                  border: paymentType === "full" ? "2px solid #8B0000" : "1px solid #e5e7eb",
-                  background: paymentType === "full" ? "rgba(139,0,0,0.04)" : allCartItems.length === 0 ? "#f9fafb" : "white",
-                  boxShadow: paymentType === "full" ? "0 2px 12px rgba(139,0,0,0.12)" : "none",
-                  opacity: allCartItems.length === 0 ? 0.55 : 1,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#8B0000", background: "rgba(139,0,0,0.08)", display: "inline-block", borderRadius: 4, padding: "2px 6px", marginBottom: 6 }}>⭐ RECOMMANDÉ</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>💳 {lang === "fr" ? "Payer la commande complète" : "全款预订"}</div>
-                      {allCartItems.length > 0 ? (
-                        <div style={{ fontSize: 14, color: "#8B0000", fontWeight: 700, marginTop: 3 }}>Total : {total.toFixed(2)} €</div>
-                      ) : (
-                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
-                          {lang === "fr" ? "Ajoutez des plats pour activer cette option" : "请先选择菜品"}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: paymentType === "full" ? "6px solid #8B0000" : "2px solid #ddd", flexShrink: 0, marginTop: 4 }} />
-                  </div>
-                  {allCartItems.length > 0 && (
-                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 2 }}>
-                      {[
-                        lang === "fr" ? "✓ Place garantie" : "✓ 座位保证",
-                        lang === "fr" ? "✓ Rien à payer à l'arrivée" : "✓ 到店无需再付款",
-                        lang === "fr" ? "✓ Annulation gratuite 24h avant" : "✓ 24小时前免费取消",
-                      ].map(txt => (
-                        <div key={txt} style={{ fontSize: 12, color: "#16a34a" }}>{txt}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Separator */}
-                <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 12, margin: "4px 0 10px" }}>— {lang === "fr" ? "ou" : "或"} —</div>
-
-                {/* Option B — deposit */}
-                <div onClick={() => setPaymentType("deposit")} style={{
-                  borderRadius: 12, padding: "14px 16px", cursor: "pointer",
-                  border: paymentType === "deposit" ? "2px solid #8B0000" : "1px solid #e5e7eb",
-                  background: paymentType === "deposit" ? "rgba(139,0,0,0.04)" : "white",
-                  boxShadow: paymentType === "deposit" ? "0 2px 12px rgba(139,0,0,0.12)" : "none",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>💳 {lang === "fr" ? "Payer un acompte de garantie" : "付定金预订"}</div>
-                      <div style={{ fontSize: 13, color: "#8B0000", fontWeight: 700, marginTop: 3 }}>
-                        {guests} × {DEPOSIT_PER_PERSON} € = {depositAmount} €
-                      </div>
-                    </div>
-                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: paymentType === "deposit" ? "6px solid #8B0000" : "2px solid #ddd", flexShrink: 0, marginTop: 4 }} />
-                  </div>
-                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 2 }}>
-                    {[
-                      lang === "fr" ? "✓ Place garantie" : "✓ 座位保证",
-                      lang === "fr" ? "✓ Déductible à l'addition" : "✓ 到店结账时抵扣",
-                      lang === "fr" ? "✓ Commandez sur place" : "✓ 到店再点菜",
-                    ].map(txt => (
-                      <div key={txt} style={{ fontSize: 12, color: "#16a34a" }}>{txt}</div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
               {submitError && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14 }}>{submitError}</div>
               )}
 
+              {allCartItems.length === 0 && (
+                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 14px", color: "#9a3412", fontSize: 13 }}>
+                  {lang === "fr" ? "⚠️ Veuillez sélectionner vos plats avant de réserver." : "⚠️ 请先选择菜品再预订。"}
+                </div>
+              )}
+
               <button onClick={handleSubmit}
-                disabled={!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting}
+                disabled={!form.name || !form.email || !form.phone || allCartItems.length === 0 || submitting}
                 style={{
                   padding: "16px", borderRadius: 12, border: "none",
-                  background: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "#ddd" : "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
-                  color: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "#999" : "white",
+                  background: (!form.name || !form.email || !form.phone || allCartItems.length === 0 || submitting) ? "#ddd" : "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)",
+                  color: (!form.name || !form.email || !form.phone || allCartItems.length === 0 || submitting) ? "#999" : "white",
                   fontSize: 16, fontWeight: 700,
-                  cursor: (!form.name || !form.email || !form.phone || (paymentType === "full" && allCartItems.length === 0) || submitting) ? "default" : "pointer",
+                  cursor: (!form.name || !form.email || !form.phone || allCartItems.length === 0 || submitting) ? "default" : "pointer",
                   opacity: submitting ? 0.7 : 1, width: "100%",
                 }}>
                 {submitting
                   ? (lang === "fr" ? "Envoi en cours..." : "提交中...")
-                  : paymentType === "full"
-                    ? `💳 Payer ${total.toFixed(2)} € et réserver`
-                    : `💳 Payer ${depositAmount} € d'acompte et réserver`
+                  : `💳 Payer ${total.toFixed(2)} € et réserver`
                 }
               </button>
             </div>
@@ -2601,16 +2502,22 @@ function BookingDepositSuccessPage({ bookingId, bookingCode }) {
                 <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Montrez ce code à votre arrivée</div>
               </div>
             )}
-            {status === "paid" && depositAmount > 0 && (
-              <div style={{ margin: "16px 0", padding: "14px 20px", background: "#fef9c3", borderRadius: 12, border: "1px solid #fde68a", textAlign: "left" }}>
-                <div style={{ fontWeight: 700, color: "#854d0e", fontSize: 15, marginBottom: 4 }}>
-                  💳 Acompte payé : {depositAmount.toFixed(2)} €
+            {status === "paid" && (
+              <div style={{ margin: "16px 0", padding: "14px 20px", background: "#f0fdf4", borderRadius: 12, border: "1px solid #bbf7d0", textAlign: "left" }}>
+                <div style={{ fontWeight: 700, color: "#166534", fontSize: 15, marginBottom: 4 }}>
+                  🟢 Paiement complet effectué
                 </div>
-                <div style={{ fontSize: 13, color: "#78350f" }}>→ Ce montant sera déduit de votre addition lors du repas.</div>
-                <div style={{ fontSize: 13, color: "#78350f", marginTop: 3 }}>✓ Annulation gratuite jusqu'à 24h avant la réservation.</div>
+                <div style={{ fontSize: 13, color: "#15803d" }}>✓ Rien à payer à votre arrivée.</div>
+                <div style={{ fontSize: 13, color: "#15803d", marginTop: 3 }}>✓ Annulation gratuite jusqu'à 24h avant la réservation.</div>
               </div>
             )}
             <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+              {bookingId && (
+                <a href={`${API}/api/neige-rouge/bookings/${bookingId}/receipt?namespace=${NS}`} target="_blank" rel="noreferrer"
+                  style={{ display: "inline-block", padding: "12px 28px", borderRadius: 10, background: "white", color: "#8B0000", fontSize: 14, fontWeight: 600, textDecoration: "none", border: "2px solid #8B0000" }}>
+                  📄 Télécharger le reçu
+                </a>
+              )}
               <a href="#" style={{ display: "inline-block", padding: "12px 28px", borderRadius: 10, background: "#8B0000", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                 ← Retour à l'accueil
               </a>
