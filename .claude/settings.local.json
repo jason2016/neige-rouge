@@ -6,7 +6,18 @@
       "Read(//opt/clawshow-mcp-server/**)",
       "Bash(scp -i /c/Users/luqia/.ssh/id_rsa -o StrictHostKeyChecking=no \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py\" \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py\" root@51.77.201.82:/opt/clawshow-mcp-server/)",
       "Bash(scp -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py\" \"c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py\" root@51.77.201.82:/opt/clawshow-mcp-server/)",
-      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"systemctl restart clawshow-mcp && sleep 2 && systemctl is-active clawshow-mcp\")"
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"systemctl restart clawshow-mcp && sleep 2 && systemctl is-active clawshow-mcp\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"find /opt/clawshow-mcp-server -name 'receipt_generator*' -o -name 'invoice*' 2>/dev/null | head -20\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"cat /opt/clawshow-mcp-server/tools/receipt_generator.py\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"grep -n 'receipt\\\\|invoice\\\\|facture\\\\|recu\\\\|receipt_counter\\\\|invoice_counter' /opt/clawshow-mcp-server/server.py | head -60\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"grep -n 'receipt\\\\|invoice\\\\|facture\\\\|receipt_counter\\\\|invoice_counter' /opt/clawshow-mcp-server/server.py | head -60\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"grep -n 'receipt\\\\|invoice\\\\|receipt_counter\\\\|invoice_counter\\\\|invoices' /opt/clawshow-mcp-server/db.py | head -40\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"cat /opt/clawshow-mcp-server/tools/dragons_elysees_db.py\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"grep -n 'receipt_counter\\\\|invoice_counter\\\\|invoices\\\\|receipt_number' /opt/clawshow-mcp-server/db.py\")",
+      "Bash(scp -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/tools/neige_rouge_receipt.py root@51.77.201.82:/opt/clawshow-mcp-server/tools/)",
+      "Bash(scp -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/db.py c:/Users/luqia/OneDrive/Development/ClawShow-Workspace/repos/clawshow-mcp-server/server.py root@51.77.201.82:/opt/clawshow-mcp-server/)",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"systemctl restart clawshow-mcp && sleep 3 && systemctl is-active clawshow-mcp\")",
+      "Bash(ssh -i /c/Users/luqia/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@51.77.201.82 \"journalctl -u clawshow-mcp -n 20 --no-pager\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\luqia\\OneDrive\\Development\\Customers\\neige-rouge\\public"

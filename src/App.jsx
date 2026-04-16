@@ -48,7 +48,7 @@ const MENU = {
     { id: "coco-jus", name: "Jus de Coco 25cl", descZh: "椰子汁 25cl", price: 2.00 },
     { id: "litchi", name: "Jus de Litchi 25cl", descZh: "荔枝汁 25cl", price: 2.00 },
     { id: "monomoko", name: "Mono Moko 32cl", descZh: "Mono Moko 32cl", price: 2.00 },
-    { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00 },
+    { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00, vat_rate: 0.20 },
   ],
 };
 
@@ -363,6 +363,67 @@ Merci pour votre confiance.</pre>`;
 // Admin — Commandes Tab
 // ---------------------------------------------------------------------------
 
+function InvoiceFormModal({ order, onClose }) {
+  const [company, setCompany] = useState("");
+  const [address, setAddress] = useState("");
+  const [vatNum, setVatNum] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (!company.trim() || !address.trim()) { setError("Nom de société et adresse requis"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/neige-rouge/orders/${order.id}/invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, client_company: company.trim(), client_address: address.trim(), client_vat_number: vatNum.trim() }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `facture-${order.order_number}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        onClose();
+      } else {
+        const d = await res.json();
+        setError(d.error || "Erreur génération facture");
+      }
+    } catch { setError("Erreur réseau"); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 18, color: "#8B0000" }}>📄 Facture — {order.order_number}</h3>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888" }}>Informations de facturation entreprise</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <input placeholder="Nom de la société *" value={company} onChange={e => setCompany(e.target.value)}
+            style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+          <input placeholder="Adresse de facturation *" value={address} onChange={e => setAddress(e.target.value)}
+            style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+          <input placeholder="N° TVA intracommunautaire (optionnel)" value={vatNum} onChange={e => setVatNum(e.target.value)}
+            style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+        </div>
+        {error && <div style={{ color: "#dc2626", fontSize: 13, marginTop: 8 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: loading ? "#ddd" : "#8B0000", color: "white", fontWeight: 700, fontSize: 14, cursor: loading ? "default" : "pointer" }}>
+            {loading ? "Génération..." : "📥 Télécharger la facture"}
+          </button>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommandesTab() {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
@@ -370,6 +431,7 @@ function CommandesTab() {
   const [loading, setLoading] = useState(false);
   const [confirmAmounts, setConfirmAmounts] = useState({}); // {order_id: amount_str}
   const [confirming, setConfirming] = useState({}); // {order_id: bool}
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
 
   const handleConfirmPayment = async (order) => {
     const amount = parseFloat(confirmAmounts[order.id] ?? order.total_amount);
@@ -507,17 +569,25 @@ function CommandesTab() {
               </div>
             )}
             {/* Action buttons */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => openTicket(order)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #ddd", background: "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => openTicket(order)} style={{ flex: 1, minWidth: 80, padding: "8px 0", borderRadius: 8, border: "1px solid #ddd", background: "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 🧾 Ticket
               </button>
-              <button onClick={() => openFacture(order)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #ddd", background: "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                📄 Facture
+              <a
+                href={`${API}/api/neige-rouge/orders/${order.id}/receipt?namespace=${NS}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ flex: 1, minWidth: 80, padding: "8px 0", borderRadius: 8, border: "1px solid #8B0000", background: "rgba(139,0,0,0.05)", color: "#8B0000", fontSize: 13, fontWeight: 600, textDecoration: "none", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              >
+                📄 Reçu PDF
+              </a>
+              <button onClick={() => setInvoiceOrder(order)} style={{ flex: 1, minWidth: 80, padding: "8px 0", borderRadius: 8, border: "1px solid #1e40af", background: "rgba(30,64,175,0.05)", color: "#1e40af", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                🏢 Facture
               </button>
             </div>
           </div>
         );
       })}
+      {invoiceOrder && <InvoiceFormModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
     </div>
   );
 }
@@ -1072,6 +1142,7 @@ function OrderPage() {
           namespace: NS,
           items: allCartItems.map(i => ({
             id: i.id, name: i.name, qty: i.qty, price: i.price,
+            ...(i.vat_rate ? { vat_rate: i.vat_rate } : {}),
             options: i.options
               ? Object.fromEntries(Object.entries(i.options).map(([k, v]) => [k, v.fr]))
               : null,
@@ -2128,9 +2199,20 @@ function PaymentSuccessPage({ orderId }) {
                 </div>
               </div>
             )}
-            <a href="#order" style={{ display: "inline-block", marginTop: 20, padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
-              {lang === "fr" ? "Nouvelle commande" : "再来一单"}
-            </a>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20, alignItems: "center" }}>
+              {orderId && (
+                <a
+                  href={`${API}/api/neige-rouge/orders/${orderId}/receipt?namespace=${NS}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 10, background: "#8B0000", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none" }}
+                >
+                  📄 Télécharger le reçu
+                </a>
+              )}
+              <a href="#order" style={{ display: "inline-block", padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                {lang === "fr" ? "Nouvelle commande" : "再来一单"}
+              </a>
+            </div>
           </>
         )}
         {status === "failed" && (
