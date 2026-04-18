@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import InstallPrompt from "./components/InstallPrompt";
 
+const SPICE_CHOICES = [
+  { value: "no_spicy", fr: "Non piquant", zh: "不辣" },
+  { value: "mild", fr: "Peu piquant", zh: "微辣" },
+  { value: "medium", fr: "Piquant", zh: "正常辣" },
+  { value: "extra", fr: "Très piquant", zh: "加辣" },
+];
+const ICE_CHOICES = [
+  { value: "ice", fr: "Avec glaçons", zh: "加冰" },
+  { value: "no_ice", fr: "Sans glaçons", zh: "不加冰" },
+];
+
+const SPICE_OPT = { key: "spice", fr: "Piquant", zh: "辣度", required: true, choices: SPICE_CHOICES };
+const ICE_OPT   = { key: "ice", fr: "Glaçons", zh: "冰度", required: true, choices: ICE_CHOICES };
+
 const MENU = {
   menus: [
     { id: "A", name: "Menu A", desc: "2 Nems légumes + Salade d'algues ou omelette nature/piquant + Nouilles ou riz", descZh: "2个蔬菜春卷 + 海藻沙拉或煎蛋 + 面或饭", price: 7.50 },
@@ -16,11 +30,11 @@ const MENU = {
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
-    { id: "bm-poulet", name: "Banh Mi Poulet", descZh: "鸡肉越南法棍", price: 6.00 },
-    { id: "bm-boeuf", name: "Banh Mi Boeuf", descZh: "牛肉越南法棍", price: 6.00 },
-    { id: "bm-veg", name: "Banh Mi Végétarien", descZh: "素越南法棍", price: 6.00 },
-    { id: "bm-special", name: "Banh Mi Poulet Croustillant ou Porc Caramel", descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40 },
-    { id: "bm-bt", name: "Banh Mi + Bubble Tea", descZh: "越南法棍 + 奶茶", price: 10.00 },
+    { id: "bm-poulet", name: "Banh Mi Poulet", descZh: "鸡肉越南法棍", price: 6.00, options: [SPICE_OPT] },
+    { id: "bm-boeuf", name: "Banh Mi Boeuf", descZh: "牛肉越南法棍", price: 6.00, options: [SPICE_OPT] },
+    { id: "bm-veg", name: "Banh Mi Végétarien", descZh: "素越南法棍", price: 6.00, options: [SPICE_OPT] },
+    { id: "bm-special", name: "Banh Mi Poulet Croustillant ou Porc Caramel", descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40, options: [SPICE_OPT] },
+    { id: "bm-bt", name: "Banh Mi + Bubble Tea", descZh: "越南法棍 + 奶茶", price: 10.00, options: [SPICE_OPT, ICE_OPT] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
@@ -47,8 +61,20 @@ const MENU = {
     { id: "mangue", name: "Jus de Mangue 25cl", descZh: "芒果汁 25cl", price: 2.00 },
     { id: "coco-jus", name: "Jus de Coco 25cl", descZh: "椰子汁 25cl", price: 2.00 },
     { id: "litchi", name: "Jus de Litchi 25cl", descZh: "荔枝汁 25cl", price: 2.00 },
-    { id: "monomoko", name: "Mono Moko 32cl", descZh: "Mono Moko 32cl", price: 2.00 },
     { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00, vat_rate: 0.20 },
+  ],
+  milkTea: [
+    { id: "mt-coco", name: "Thé au lait Coco", descZh: "椰子奶茶", price: 3.50, options: [ICE_OPT] },
+    { id: "mt-mangue", name: "Thé au lait Mangue", descZh: "芒果奶茶", price: 3.50, options: [ICE_OPT] },
+    { id: "mt-fraise", name: "Thé au lait Fraise", descZh: "草莓奶茶", price: 3.50, options: [ICE_OPT] },
+    { id: "mt-taro", name: "Thé au lait Taro", descZh: "芋头奶茶", price: 3.50, options: [ICE_OPT] },
+  ],
+  fruitTea: [
+    { id: "ft-citron", name: "Thé Citron", descZh: "柠檬茶", price: 3.50, options: [ICE_OPT] },
+    { id: "ft-mangue", name: "Thé Mangue", descZh: "芒果茶", price: 3.50, options: [ICE_OPT] },
+    { id: "ft-fraise", name: "Thé Fraise", descZh: "草莓茶", price: 3.50, options: [ICE_OPT] },
+    { id: "ft-passion", name: "Thé Fruit de la Passion", descZh: "百香果茶", price: 3.50, options: [ICE_OPT] },
+    { id: "ft-litchi", name: "Thé Litchi", descZh: "荔枝茶", price: 3.50, options: [ICE_OPT] },
   ],
 };
 
@@ -145,7 +171,7 @@ const t = {
     subtitle: "Cuisine Vietnamienne Authentique",
     tagline: "红雪 · Depuis 2015",
     nav: { menu: "Carte", order: "Commander", contact: "Contact" },
-    sections: { menus: "Menu Bento", plats: "Plats", banhMi: "Banh Mi", boBun: "Bò Bún", carte: "À la Carte", desserts: "Desserts", boissons: "Boissons" },
+    sections: { menus: "Menu Bento", plats: "Plats", banhMi: "Banh Mi", boBun: "Bò Bún", carte: "À la Carte", desserts: "Desserts", boissons: "Boissons", milkTea: "Thé au lait", fruitTea: "Thé aux fruits" },
     order: {
       title: "Votre commande",
       empty: "Votre panier est vide",
@@ -178,7 +204,7 @@ const t = {
     subtitle: "正宗越南料理",
     tagline: "Neige Rouge · 始于2015",
     nav: { menu: "菜单", order: "下单", contact: "联系" },
-    sections: { menus: "便当套餐", plats: "主菜", banhMi: "越南法棍", boBun: "米粉沙拉", carte: "单点", desserts: "甜点", boissons: "饮品" },
+    sections: { menus: "便当套餐", plats: "主菜", banhMi: "越南法棍", boBun: "米粉沙拉", carte: "单点", desserts: "甜点", boissons: "饮品", milkTea: "奶茶", fruitTea: "水果茶" },
     order: {
       title: "您的订单",
       empty: "购物车为空",
@@ -1087,6 +1113,59 @@ function MenuCustomizer({ item, lang, onConfirm, onClose }) {
   );
 }
 
+function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
+  const [selections, setSelections] = useState({});
+  const allSelected = item.options.every(opt => !opt.required || selections[opt.key]);
+  const pick = (key, choice) => setSelections(prev => ({ ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value } }));
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "white", borderRadius: "20px 20px 0 0", padding: "20px 16px 40px", maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ width: 40, height: 4, background: "#ddd", borderRadius: 2, margin: "0 auto 16px" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{item.name}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginTop: 2 }}>{item.price.toFixed(2)}€</div>
+          </div>
+          <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 20, cursor: "pointer", flexShrink: 0 }}>×</button>
+        </div>
+        {item.options.map(opt => (
+          <div key={opt.key} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }}>
+              {lang === "zh" ? opt.zh : opt.fr}
+              {opt.required && <span style={{ color: "#8B0000", marginLeft: 4 }}>*</span>}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {opt.choices.map(choice => {
+                const selected = selections[opt.key]?.value === choice.value;
+                return (
+                  <button key={choice.value} onClick={() => pick(opt.key, choice)} style={{
+                    padding: "14px 16px", borderRadius: 12, textAlign: "left",
+                    border: selected ? "2px solid #8B0000" : "1.5px solid #e5e5e5",
+                    background: selected ? "rgba(139,0,0,0.06)" : "white",
+                    color: selected ? "#8B0000" : "#333",
+                    fontSize: 15, fontWeight: selected ? 700 : 500, cursor: "pointer",
+                  }}>
+                    {lang === "zh" ? choice.zh : choice.fr}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button onClick={() => allSelected && onConfirm(selections)} disabled={!allSelected} style={{
+          width: "100%", padding: 18, borderRadius: 12, border: "none",
+          background: allSelected ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#e5e5e5",
+          color: allSelected ? "white" : "#999",
+          fontSize: 18, fontWeight: 700, cursor: allSelected ? "pointer" : "default",
+        }}>
+          {lang === "zh" ? "加入购物车 +" : "Ajouter au panier +"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }) {
   return (
     <div style={{ marginBottom: 28 }}>
@@ -1142,17 +1221,6 @@ function LandingPage() {
             {lang === "fr" ? "Scannez, commandez, dégustez" : "扫码点餐，即刻享用"}
           </div>
         </a>
-        <a href="#menu" style={{
-          display: "block", width: "100%", padding: "28px 20px", borderRadius: 16,
-          background: "white", border: "2px solid #8B0000",
-          color: "#8B0000", textAlign: "center", textDecoration: "none",
-          fontSize: 20, fontWeight: 700, boxSizing: "border-box",
-        }}>
-          {lang === "fr" ? "Réserver à l'avance" : "提前预订"}
-          <div style={{ fontSize: 13, fontWeight: 400, color: "#888", marginTop: 6 }}>
-            {lang === "fr" ? "Commandez pour demain" : "预订明天的餐食"}
-          </div>
-        </a>
       </div>
       <div style={{ textAlign: "center", padding: "20px", fontSize: 11, color: "#ccc" }}>
         7 rue des Ursulines, 75005 Paris
@@ -1169,9 +1237,11 @@ function LandingPage() {
 
 function OrderPage() {
   const [lang, setLang] = useState("fr");
-  const [cart, setCart] = useState({});               // non-bento: { [id]: qty }
+  const [cart, setCart] = useState({});               // non-bento, no-option items: { [id]: qty }
   const [menuSelections, setMenuSelections] = useState([]); // bento: [{uid, menuId, options}]
+  const [optionSelections, setOptionSelections] = useState([]); // items with options: [{uid, itemId, selections}]
   const [customizerItem, setCustomizerItem] = useState(null);
+  const [optionsItem, setOptionsItem] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderType, setOrderType] = useState("dine_in");
   const [paymentMethod, setPaymentMethod] = useState("online");
@@ -1182,11 +1252,27 @@ function OrderPage() {
   const [submitError, setSubmitError] = useState("");
 
   const T = t[lang];
-  const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
+  const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons, ...MENU.milkTea, ...MENU.fruitTea];
 
-  // Non-bento cart handlers
+  // Non-bento, no-option cart handlers
   const add = (id) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
   const remove = (id) => setCart(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
+
+  // Option-item handlers (uid-based, like bento)
+  const optionCount = (itemId) => optionSelections.filter(s => s.itemId === itemId).length;
+  const removeLastOptionItem = (itemId) => setOptionSelections(prev => {
+    const idx = prev.map(s => s.itemId).lastIndexOf(itemId);
+    if (idx < 0) return prev;
+    return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+  });
+  const confirmItemOptions = (selections) => {
+    setOptionSelections(prev => [...prev, {
+      uid: `${optionsItem.id}-${Date.now()}`,
+      itemId: optionsItem.id,
+      selections,
+    }]);
+    setOptionsItem(null);
+  };
 
   // Bento cart handlers
   const bentoCount = (menuId) => menuSelections.filter(s => s.menuId === menuId).length;
@@ -1215,7 +1301,11 @@ function OrderPage() {
     ...MENU.menus.find(m => m.id === sel.menuId),
     qty: 1, options: sel.options, uid: sel.uid,
   }));
-  const allCartItems = [...bentoCartItems, ...nonBentoCartItems];
+  const optionCartItems = optionSelections.map(sel => ({
+    ...flatItems.find(i => i.id === sel.itemId),
+    qty: 1, options: sel.selections, uid: sel.uid,
+  }));
+  const allCartItems = [...bentoCartItems, ...nonBentoCartItems, ...optionCartItems];
   const total = allCartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = allCartItems.reduce((s, i) => s + i.qty, 0);
 
@@ -1328,7 +1418,7 @@ function OrderPage() {
               <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{total.toFixed(2)}€</span>
             </div>
           </div>
-          <button onClick={() => { setSubmitted(false); setCart({}); setMenuSelections([]); setOrderNumber(""); }}
+          <button onClick={() => { setSubmitted(false); setCart({}); setMenuSelections([]); setOptionSelections([]); setOrderNumber(""); }}
             style={{ padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             {lang === "fr" ? "Nouvelle commande" : "再来一单"}
           </button>
@@ -1372,7 +1462,8 @@ function OrderPage() {
           {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
         </Section>
         <Section title={T.sections.banhMi}>
-          {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
         </Section>
         <Section title={T.sections.boBun}>
           {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
@@ -1386,11 +1477,24 @@ function OrderPage() {
         <Section title={T.sections.boissons}>
           {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
         </Section>
+        <Section title={T.sections.milkTea}>
+          {MENU.milkTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+        </Section>
+        <Section title={T.sections.fruitTea}>
+          {MENU.fruitTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+        </Section>
       </div>
 
       {/* Customizer modal */}
       {customizerItem && (
         <MenuCustomizer item={customizerItem} lang={lang} onConfirm={confirmBento} onClose={() => setCustomizerItem(null)} />
+      )}
+
+      {/* Item options modal */}
+      {optionsItem && (
+        <ItemOptionsModal item={optionsItem} lang={lang} onConfirm={confirmItemOptions} onClose={() => setOptionsItem(null)} />
       )}
 
       {/* Confirm modal */}
