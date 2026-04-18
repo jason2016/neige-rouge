@@ -35,6 +35,7 @@ const MENU = {
     { id: "bm-veg", name: "Banh Mi Végétarien", descZh: "素越南法棍", price: 6.00, options: [SPICE_OPT] },
     { id: "bm-special", name: "Banh Mi Poulet Croustillant ou Porc Caramel", descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40, options: [SPICE_OPT] },
     { id: "bm-bt", name: "Banh Mi + Bubble Tea", descZh: "越南法棍 + 奶茶", price: 10.00, options: [SPICE_OPT, ICE_OPT] },
+    { id: "bm-special-bt", name: "Banh Mi Poulet Croustillant ou Porc Caramel + Bubble Tea", descZh: "脆皮鸡/焦糖猪肉法棍 + 奶茶", price: 10.40, options: [SPICE_OPT, ICE_OPT] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
