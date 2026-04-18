@@ -680,6 +680,212 @@ function CommandesTab() {
   );
 }
 
+function StockTab() {
+  const today = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(today);
+  const [stock, setStock] = useState({});
+  const [limits, setLimits] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const allSections = [
+    { title: "Menu Bento", items: MENU.menus },
+    { title: "Plats", items: MENU.plats },
+    { title: "Banh Mi", items: MENU.banhMi },
+    { title: "Bò Bún", items: MENU.boBun },
+    { title: "À la Carte", items: MENU.carte },
+    { title: "Desserts", items: MENU.desserts },
+    { title: "Boissons", items: MENU.boissons },
+    { title: "Thé au lait", items: MENU.milkTea },
+    { title: "Thé aux fruits", items: MENU.fruitTea },
+  ];
+
+  const fetchStock = async (d) => {
+    try {
+      const res = await fetch(`${API}/api/inventory?namespace=${NS}&date=${d}`);
+      const data = await res.json();
+      const s = data.stock || {};
+      setStock(s);
+      const newLimits = {};
+      Object.entries(s).forEach(([id, v]) => { newLimits[id] = String(v.limit); });
+      setLimits(newLimits);
+    } catch {}
+  };
+
+  useEffect(() => { fetchStock(date); }, [date]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const items = allSections.flatMap(s => s.items)
+      .filter(item => limits[item.id] !== undefined && limits[item.id] !== "")
+      .map(item => ({ id: item.id, limit: parseInt(limits[item.id] || 0, 10) }))
+      .filter(item => !isNaN(item.limit));
+    try {
+      await fetch(`${API}/api/inventory/set`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, date, items }),
+      });
+      setMsg("✅ Enregistré · 已保存");
+      fetchStock(date);
+    } catch { setMsg("❌ Erreur"); }
+    setSaving(false);
+    setTimeout(() => setMsg(""), 2500);
+  };
+
+  const handleRestoreYesterday = async () => {
+    setRestoring(true);
+    try {
+      const res = await fetch(`${API}/api/inventory/restore-yesterday`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, date }),
+      });
+      const data = await res.json();
+      setMsg(data.success ? "✅ Restauré depuis hier · 已恢复昨日" : `⚠️ ${data.error}`);
+      if (data.success) fetchStock(date);
+    } catch { setMsg("❌ Erreur"); }
+    setRestoring(false);
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+        <button onClick={() => setDate(today)} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", background: date === today ? "rgba(139,0,0,0.06)" : "white", color: date === today ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          Aujourd'hui
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button onClick={handleRestoreYesterday} disabled={restoring} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid #ddd", background: restoring ? "#ddd" : "white", color: "#444", fontSize: 13, fontWeight: 600, cursor: restoring ? "default" : "pointer" }}>
+          {restoring ? "..." : "♻️ Restaurer d'hier · 恢复昨日"}
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: saving ? "#ddd" : "#8B0000", color: "white", fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+          {saving ? "..." : "💾 Enregistrer · 保存"}
+        </button>
+      </div>
+      {msg && <div style={{ textAlign: "center", padding: "8px 12px", background: "#f0fdf4", color: "#166534", borderRadius: 8, marginBottom: 12, fontSize: 14, fontWeight: 600 }}>{msg}</div>}
+      <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Limite vide ou 0 = illimité · 空或0表示不限量</div>
+      {allSections.map(sec => (
+        <div key={sec.title} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#8B0000", marginBottom: 8, paddingBottom: 6, borderBottom: "2px solid #8B0000" }}>{sec.title}</div>
+          {sec.items.map(item => {
+            const s = stock[item.id];
+            return (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #f5f5f5" }}>
+                <div style={{ flex: 1, fontSize: 13 }}>
+                  <span style={{ fontWeight: 600 }}>{item.name}</span>
+                  {s?.sold_out && <span style={{ marginLeft: 6, background: "#fee2e2", color: "#dc2626", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>ÉPUISÉ</span>}
+                </div>
+                {s && <div style={{ fontSize: 12, color: "#888", minWidth: 60, textAlign: "right" }}>vendu: {s.sold_count}/{s.limit}</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: "#999" }}>Limite</span>
+                  <input type="number" min="0" step="1" placeholder="∞"
+                    value={limits[item.id] ?? ""}
+                    onChange={e => setLimits(p => ({ ...p, [item.id]: e.target.value }))}
+                    style={{ width: 56, padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, fontWeight: 700, textAlign: "center", outline: "none" }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RapportTab() {
+  const today = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(today);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchOrders = async (d) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch { setOrders([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchOrders(date); }, [date]);
+
+  const paid = orders.filter(o => o.payment_status === "paid");
+  const total = paid.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const byMethod = {};
+  paid.forEach(o => {
+    const m = o.payment_method || "unknown";
+    if (!byMethod[m]) byMethod[m] = { count: 0, amount: 0 };
+    byMethod[m].count++;
+    byMethod[m].amount += o.total_amount || 0;
+  });
+  const methodLabels = { online: "💳 En ligne (Stancer)", card_counter: "💳 Carte comptoir", cash: "💶 Espèces", unknown: "Autre" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
+        <button onClick={() => setDate(today)} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", background: date === today ? "rgba(139,0,0,0.06)" : "white", color: date === today ? "#8B0000" : "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          Aujourd'hui
+        </button>
+        <button onClick={() => fetchOrders(date)} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 14 }}>🔄</button>
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+      ) : (
+        <>
+          <div style={{ background: "white", borderRadius: 14, padding: 20, marginBottom: 12, border: "1px solid #eee", textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 3, marginBottom: 6 }}>Total encaissé · 今日营收</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 44, fontWeight: 700, color: "#16a34a" }}>{total.toFixed(2)}€</div>
+            <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{paid.length} commandes payées · {orders.length} total</div>
+          </div>
+          <div style={{ background: "white", borderRadius: 14, padding: 16, border: "1px solid #eee", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#8B0000", marginBottom: 12 }}>Par mode de paiement · 支付方式</div>
+            {Object.entries(byMethod).length === 0 ? (
+              <div style={{ textAlign: "center", padding: 20, color: "#ccc", fontSize: 13 }}>Aucune commande payée</div>
+            ) : Object.entries(byMethod).map(([method, v]) => (
+              <div key={method} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{methodLabels[method] || method}</div>
+                  <div style={{ fontSize: 12, color: "#999" }}>{v.count} commande{v.count > 1 ? "s" : ""}</div>
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 18, color: "#8B0000" }}>{v.amount.toFixed(2)}€</div>
+              </div>
+            ))}
+          </div>
+          {paid.length > 0 && (() => {
+            const itemMap = {};
+            paid.forEach(o => {
+              (o.items || []).forEach(item => {
+                if (!itemMap[item.name]) itemMap[item.name] = { qty: 0, amount: 0 };
+                itemMap[item.name].qty += item.qty || 1;
+                itemMap[item.name].amount += (item.price || 0) * (item.qty || 1);
+              });
+            });
+            const sorted = Object.entries(itemMap).sort((a, b) => b[1].qty - a[1].qty);
+            return (
+              <div style={{ background: "white", borderRadius: 14, padding: 16, border: "1px solid #eee" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#8B0000", marginBottom: 12 }}>Top produits · 销售明细</div>
+                {sorted.map(([name, v]) => (
+                  <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f5f5f5", fontSize: 13 }}>
+                    <span>{name} <span style={{ color: "#999" }}>×{v.qty}</span></span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600 }}>{v.amount.toFixed(2)}€</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminPanel() {
   const [lang, setLang] = useState("fr");
   const [tab, setTab] = useState("reservations");
@@ -809,8 +1015,10 @@ function AdminPanel() {
       {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "2px solid #eee", background: "white", position: "sticky", top: 0, zIndex: 10 }}>
         {[
-          { key: "reservations", label: "Réservations 预订" },
-          { key: "commandes", label: "Commandes 订单" },
+          { key: "reservations", label: "Réservations" },
+          { key: "commandes", label: "Commandes" },
+          { key: "stock", label: "Stock 库存" },
+          { key: "rapport", label: "Rapport 日报" },
         ].map(tb => (
           <button key={tb.key} onClick={() => setTab(tb.key)} style={{
             flex: 1, padding: "13px 8px", border: "none", background: "none", cursor: "pointer",
@@ -824,6 +1032,8 @@ function AdminPanel() {
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
 
         {tab === "commandes" && <CommandesTab />}
+        {tab === "stock" && <StockTab />}
+        {tab === "rapport" && <RapportTab />}
         {tab === "reservations" && <>
 
         {/* Date selector — quick buttons */}
@@ -956,12 +1166,12 @@ function AdminPanel() {
 }
 
 
-function ItemRow({ item, lang, qty, onAdd, onRemove }) {
+function ItemRow({ item, lang, qty, onAdd, onRemove, soldOut }) {
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "14px 0",
-      borderBottom: "1px solid rgba(139,0,0,0.08)",
+      padding: "14px 0", borderBottom: "1px solid rgba(139,0,0,0.08)",
+      opacity: soldOut ? 0.55 : 1,
     }}>
       <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -971,13 +1181,16 @@ function ItemRow({ item, lang, qty, onAdd, onRemove }) {
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#8B0000", fontSize: 14 }}>
             {item.price.toFixed(2)}€
           </span>
+          {soldOut && <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+            {lang === "zh" ? "售完" : "Épuisé"}
+          </span>}
         </div>
         <div style={{ fontSize: 12.5, color: "#888", marginTop: 3, lineHeight: 1.4 }}>
           {lang === "zh" && item.descZh ? item.descZh : item.desc}
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {qty > 0 && (
+        {qty > 0 && !soldOut && (
           <>
             <button onClick={() => onRemove(item.id)} style={{
               width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #ccc",
@@ -987,12 +1200,12 @@ function ItemRow({ item, lang, qty, onAdd, onRemove }) {
             <span style={{ width: 24, textAlign: "center", fontWeight: 700, fontSize: 15, color: "#8B0000" }}>{qty}</span>
           </>
         )}
-        <button onClick={() => onAdd(item.id)} style={{
+        <button onClick={() => !soldOut && onAdd(item.id)} disabled={soldOut} style={{
           width: 28, height: 28, borderRadius: "50%",
-          border: qty > 0 ? "1.5px solid #8B0000" : "1.5px solid #ccc",
-          background: qty > 0 ? "#8B0000" : "white",
-          color: qty > 0 ? "white" : "#666",
-          fontSize: 16, cursor: "pointer",
+          border: soldOut ? "1.5px solid #ddd" : qty > 0 ? "1.5px solid #8B0000" : "1.5px solid #ccc",
+          background: soldOut ? "#f5f5f5" : qty > 0 ? "#8B0000" : "white",
+          color: soldOut ? "#ccc" : qty > 0 ? "white" : "#666",
+          fontSize: 16, cursor: soldOut ? "not-allowed" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
         }}>+</button>
       </div>
@@ -1243,6 +1456,13 @@ function OrderPage() {
   const [optionSelections, setOptionSelections] = useState([]); // items with options: [{uid, itemId, selections}]
   const [customizerItem, setCustomizerItem] = useState(null);
   const [optionsItem, setOptionsItem] = useState(null);
+  const [stock, setStock] = useState({});             // {item_id: {limit, sold_count, sold_out}}
+
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    fetch(`${API}/api/inventory?namespace=${NS}&date=${today}`)
+      .then(r => r.json()).then(d => setStock(d.stock || {})).catch(() => {});
+  }, []);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderType, setOrderType] = useState("dine_in");
   const [paymentMethod, setPaymentMethod] = useState("online");
@@ -1460,31 +1680,31 @@ function OrderPage() {
           ))}
         </Section>
         <Section title={T.sections.plats}>
-          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.banhMi}>
           {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang}
-            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.boBun}>
-          {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.carte}>
-          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.desserts}>
-          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.boissons}>
-          {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.milkTea}>
           {MENU.milkTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
-            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.fruitTea}>
           {MENU.fruitTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
-            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
       </div>
 
@@ -1829,6 +2049,14 @@ function KitchenPanel() {
     playReadySound();
   };
 
+  const confirmPayment = async (id, paymentMethod) => {
+    await fetch(`${API}/api/order/${id}/confirm-payment`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ namespace: NS, payment_method: paymentMethod }),
+    });
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: "paid" } : o));
+  };
+
   const markPicked = async (id) => {
     await fetch(`${API}/api/order/${id}/picked`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -1964,15 +2192,32 @@ function KitchenPanel() {
                     </div>
                   ))}
                 </div>
+                {(order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
+                  <button onClick={() => confirmPayment(order.id, order.payment_method)} style={{
+                    width: "100%", padding: 16, borderRadius: 12, border: "none", marginBottom: 10,
+                    background: "#f97316", color: "white", fontSize: 20, fontWeight: 700, cursor: "pointer",
+                  }}>
+                    {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : "💶 Confirmer paiement espèces · 确认收现金"}
+                  </button>
+                )}
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => openTicketForOrder(order)} style={{
                     flex: 1, padding: 14, borderRadius: 12, border: "none",
                     background: "#374151", color: "white", fontSize: 18, fontWeight: 700, cursor: "pointer",
                   }}>🖨️</button>
-                  <button onClick={() => markReady(order.id)} style={{
-                    flex: 3, padding: 14, borderRadius: 12, border: "none",
-                    background: "#16a34a", color: "white", fontSize: 20, fontWeight: 700, cursor: "pointer",
-                  }}>✓ Terminé · 完成</button>
+                  {(() => {
+                    const isPaid = order.payment_status === "paid" || order.order_source === "reservation";
+                    return (
+                      <button onClick={() => isPaid && markReady(order.id)} style={{
+                        flex: 3, padding: 14, borderRadius: 12, border: "none",
+                        background: isPaid ? "#16a34a" : "#374151",
+                        color: isPaid ? "white" : "#666",
+                        fontSize: 20, fontWeight: 700, cursor: isPaid ? "pointer" : "not-allowed",
+                      }}>
+                        {isPaid ? "✓ Terminé · 完成" : "🔒 Terminé · 待付款"}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );
