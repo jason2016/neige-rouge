@@ -781,10 +781,11 @@ function StockTab() {
                 {s && <div style={{ fontSize: 12, color: "#888", minWidth: 60, textAlign: "right" }}>vendu: {s.sold_count}/{s.limit}</div>}
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontSize: 11, color: "#999" }}>Limite</span>
-                  <input type="number" min="0" step="1" placeholder="∞"
+                  <input type="number" min="0" step="1"
                     value={limits[item.id] ?? ""}
                     onChange={e => setLimits(p => ({ ...p, [item.id]: e.target.value }))}
                     style={{ width: 56, padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, fontWeight: 700, textAlign: "center", outline: "none" }}
+                    placeholder="0"
                   />
                 </div>
               </div>
@@ -888,7 +889,7 @@ function RapportTab() {
 
 function AdminPanel() {
   const [lang, setLang] = useState("fr");
-  const [tab, setTab] = useState("reservations");
+  const [tab, setTab] = useState("commandes");
   const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1");
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
@@ -1015,8 +1016,7 @@ function AdminPanel() {
       {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "2px solid #eee", background: "white", position: "sticky", top: 0, zIndex: 10 }}>
         {[
-          { key: "reservations", label: "Réservations" },
-          { key: "commandes", label: "Commandes" },
+          { key: "commandes", label: "Commandes 订单" },
           { key: "stock", label: "Stock 库存" },
           { key: "rapport", label: "Rapport 日报" },
         ].map(tb => (
