@@ -64,17 +64,17 @@ const MENU = {
     { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00, vat_rate: 0.20 },
   ],
   milkTea: [
-    { id: "mt-coco", name: "Thé au lait Coco", descZh: "椰子奶茶", price: 3.50, options: [ICE_OPT] },
-    { id: "mt-mangue", name: "Thé au lait Mangue", descZh: "芒果奶茶", price: 3.50, options: [ICE_OPT] },
-    { id: "mt-fraise", name: "Thé au lait Fraise", descZh: "草莓奶茶", price: 3.50, options: [ICE_OPT] },
-    { id: "mt-taro", name: "Thé au lait Taro", descZh: "芋头奶茶", price: 3.50, options: [ICE_OPT] },
+    { id: "mt-coco", name: "Thé au lait Coco", descZh: "椰子奶茶", price: 5.00, options: [ICE_OPT] },
+    { id: "mt-mangue", name: "Thé au lait Mangue", descZh: "芒果奶茶", price: 5.00, options: [ICE_OPT] },
+    { id: "mt-fraise", name: "Thé au lait Fraise", descZh: "草莓奶茶", price: 5.00, options: [ICE_OPT] },
+    { id: "mt-taro", name: "Thé au lait Taro", descZh: "芋头奶茶", price: 5.00, options: [ICE_OPT] },
   ],
   fruitTea: [
-    { id: "ft-citron", name: "Thé Citron", descZh: "柠檬茶", price: 3.50, options: [ICE_OPT] },
-    { id: "ft-mangue", name: "Thé Mangue", descZh: "芒果茶", price: 3.50, options: [ICE_OPT] },
-    { id: "ft-fraise", name: "Thé Fraise", descZh: "草莓茶", price: 3.50, options: [ICE_OPT] },
-    { id: "ft-passion", name: "Thé Fruit de la Passion", descZh: "百香果茶", price: 3.50, options: [ICE_OPT] },
-    { id: "ft-litchi", name: "Thé Litchi", descZh: "荔枝茶", price: 3.50, options: [ICE_OPT] },
+    { id: "ft-citron", name: "Thé Citron", descZh: "柠檬茶", price: 5.00, options: [ICE_OPT] },
+    { id: "ft-mangue", name: "Thé Mangue", descZh: "芒果茶", price: 5.00, options: [ICE_OPT] },
+    { id: "ft-fraise", name: "Thé Fraise", descZh: "草莓茶", price: 5.00, options: [ICE_OPT] },
+    { id: "ft-passion", name: "Thé Fruit de la Passion", descZh: "百香果茶", price: 5.00, options: [ICE_OPT] },
+    { id: "ft-litchi", name: "Thé Litchi", descZh: "荔枝茶", price: 5.00, options: [ICE_OPT] },
   ],
 };
 
