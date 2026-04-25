@@ -1990,6 +1990,7 @@ function KitchenPanel() {
   const orderIdsRef = useRef(new Set());
   const readyIdsRef = useRef(new Set());
   const printedIdsRef = useRef(new Set());
+  const isFirstPollRef = useRef(true);
   const audioCtxRef = useRef(null);
 
   const playSound = (freq = 880, duration = 0.3) => {
@@ -2031,25 +2032,31 @@ function KitchenPanel() {
         // Detect new pending orders → auto-show ticket modal
         const pendingOrders = newOrders.filter(o => o.status === "pending");
         const pendingIds = new Set(pendingOrders.map(o => o.id));
-        let hasNew = false;
-        for (const order of pendingOrders) {
-          if (!orderIdsRef.current.has(order.id)) {
-            hasNew = true;
-            // Show ticket modal for first new order (if none currently shown)
-            if (!printedIdsRef.current.has(order.id)) {
-              setTicketOrder(prev => prev || order);
+        const readyIds = new Set(newOrders.filter(o => o.status === "ready").map(o => o.id));
+
+        if (isFirstPollRef.current) {
+          // First poll after load: seed known IDs silently, don't alert for pre-existing orders
+          orderIdsRef.current = pendingIds;
+          readyIdsRef.current = readyIds;
+          isFirstPollRef.current = false;
+        } else {
+          let hasNew = false;
+          for (const order of pendingOrders) {
+            if (!orderIdsRef.current.has(order.id)) {
+              hasNew = true;
+              if (!printedIdsRef.current.has(order.id)) {
+                setTicketOrder(prev => prev || order);
+              }
             }
           }
-        }
-        if (hasNew) playNewOrderSound();
-        orderIdsRef.current = pendingIds;
+          if (hasNew) playNewOrderSound();
+          orderIdsRef.current = pendingIds;
 
-        // Detect newly ready orders
-        const readyIds = new Set(newOrders.filter(o => o.status === "ready").map(o => o.id));
-        for (const id of readyIds) {
-          if (!readyIdsRef.current.has(id)) { playReadySound(); break; }
+          for (const id of readyIds) {
+            if (!readyIdsRef.current.has(id)) { playReadySound(); break; }
+          }
+          readyIdsRef.current = readyIds;
         }
-        readyIdsRef.current = readyIds;
 
         // Auto-mark ready orders as picked after 5 min
         const now = new Date();
@@ -2071,7 +2078,7 @@ function KitchenPanel() {
             const items = typeof o.items === "string" ? JSON.parse(o.items || "[]") : (o.items || []);
             return items.length > 0;
           }
-          return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
+          return o.payment_status === "paid" || o.payment_status === "pending" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
         }));
       } catch {}
     };
@@ -2251,7 +2258,7 @@ function KitchenPanel() {
                     {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : order.payment_status === "pending_terminal" ? "💳 Confirmer Terminal Stancer · 确认刷卡机" : order.payment_status === "unpaid_order_started" ? "✅ Confirmer encaissement · 确认收款" : "💶 Confirmer paiement espèces · 确认收现金"}
                   </button>
                 )}
-                {DEMO_MODE && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "pending_sumup") && (
+                {DEMO_MODE && (order.payment_status === "pending" || order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "pending_sumup") && (
                   <button
                     onClick={() => fetch(`${API}/api/dev/mock-payment-success/${NS}/${order.id}`, { method: "POST" }).catch(() => {})}
                     style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", marginBottom: 10, background: "#fbbf24", color: "#1f2937", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
@@ -2889,6 +2896,13 @@ function PaymentMethodPage() {
 
   const handleSelect = async (method) => {
     setSelected(method);
+    // For in_person_solo: navigate to waiting screen immediately without calling /api/payment/create.
+    // The order stays in its initial pending state so the kitchen can show the demo confirm button.
+    // Phase 2: WaitingForPaymentPage will initiate the SumUp TPE transaction on mount.
+    if (method === "in_person_solo") {
+      window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -2909,15 +2923,14 @@ function PaymentMethodPage() {
       if (method === "at_pickup") {
         window.location.hash = `order-success?order_id=${orderId}&mode=cash`;
       } else if (method === "online") {
-        if (data.hosted_checkout_url) {
-          window.location.href = data.hosted_checkout_url;
+        const url = data.payment_url || data.hosted_checkout_url;
+        if (url) {
+          window.location.href = url;
         } else {
           setError(lang === "fr" ? "URL de paiement introuvable" : "支付链接不可用");
           setLoading(false);
           setSelected(null);
         }
-      } else if (method === "in_person_solo") {
-        window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;
       }
     } catch {
       setError(lang === "fr" ? "Erreur de connexion" : "网络错误");
