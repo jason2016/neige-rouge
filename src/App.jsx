@@ -235,8 +235,28 @@ const t = {
   },
 };
 
-const API = "https://mcp.clawshow.ai";
-const NS = "neige-rouge";
+const API = import.meta.env.VITE_API_BASE || "https://mcp.clawshow.ai";
+const NS = import.meta.env.VITE_NAMESPACE || "neige-rouge";
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+
+// Feature flags — keyed by namespace so any restaurant can reuse this app
+const FEATURES_CONFIG = {
+  "neige-rouge": {
+    bookings: false,       // hidden until operations stabilized
+    cardTerminal: true,    // Stancer Terminal Phase 1
+    stockManagement: true,
+    dailyReport: true,
+    workStation: true,     // dual-screen work-station view
+  },
+  "dragons-elysees": {
+    bookings: true,
+    cardTerminal: false,
+    stockManagement: false,
+    dailyReport: false,
+    workStation: false,
+  },
+};
+const F = FEATURES_CONFIG[NS] ?? {};
 
 const LOGO_URL = "https://focusingpro.s3.amazonaws.com/FutuShow/system/images/sYtqj14lsLGv.png";
 
@@ -302,7 +322,7 @@ function openTicket(order) {
   const dateStr = `${dt.getDate().toString().padStart(2,"0")}/${(dt.getMonth()+1).toString().padStart(2,"0")}/${dt.getFullYear()}`;
   const timeStr = `${dt.getHours().toString().padStart(2,"0")}:${dt.getMinutes().toString().padStart(2,"0")}`;
   const typeStr = order.order_type === "dine_in" ? "Sur place" : "À emporter";
-  const pmLabels = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces" };
+  const pmLabels = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces", card_terminal: "Terminal Stancer" };
   const payStr = order.payment_status === "paid" ? (pmLabels[order.payment_method] || "Carte (Stancer)") : "Non payé";
 
   let lines = "";
@@ -348,7 +368,7 @@ function openFacture(order) {
   const ttc = order.total_amount || 0;
   const ht = ttc / (1 + tvaRate);
   const tva = ttc - ht;
-  const pmLabelsF = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces" };
+  const pmLabelsF = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces", card_terminal: "Terminal Stancer" };
   const payStr = order.payment_status === "paid" ? (pmLabelsF[order.payment_method] || "Carte bancaire") : "Non payé";
 
   let lines = "";
@@ -521,7 +541,7 @@ function CommandesTab() {
   const done = orders.filter(o => o.status === "ready" || o.status === "picked").length;
 
   const statusStyle = { pending: { bg: "#fef9c3", color: "#854d0e", label: "En attente" }, preparing: { bg: "#dbeafe", color: "#1e40af", label: "En préparation" }, ready: { bg: "#dcfce7", color: "#166534", label: "Prêt" }, picked: { bg: "#f3f4f6", color: "#6b7280", label: "Récupéré" } };
-  const payStyle = { paid: { bg: "#dcfce7", color: "#166534", label: "Payé" }, unpaid: { bg: "#fee2e2", color: "#991b1b", label: "Impayé" }, pending_counter: { bg: "#fff7ed", color: "#c2410c", label: "💳 待刷卡" }, pending_cash: { bg: "#f0fdf4", color: "#15803d", label: "💶 待现金" } };
+  const payStyle = { paid: { bg: "#dcfce7", color: "#166534", label: "Payé" }, unpaid: { bg: "#fee2e2", color: "#991b1b", label: "Impayé" }, pending_counter: { bg: "#fff7ed", color: "#c2410c", label: "💳 待刷卡" }, pending_cash: { bg: "#f0fdf4", color: "#15803d", label: "💶 待现金" }, pending_terminal: { bg: "#eef2ff", color: "#4338ca", label: "📲 Terminal" } };
 
   const fmt = (isoStr) => { const d = new Date(isoStr); return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`; };
 
@@ -636,10 +656,10 @@ function CommandesTab() {
               </div>
             )}
             {/* Confirm counter payment (dine-in only) */}
-            {!isReservation && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
-              <div style={{ background: "#fff7ed", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #fed7aa" }}>
-                <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 700, marginBottom: 8 }}>
-                  {order.payment_status === "pending_counter" ? "💳 Encaisser par carte" : "💶 Encaisser en espèces"}
+            {!isReservation && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal") && (
+              <div style={{ background: order.payment_status === "pending_terminal" ? "#eef2ff" : "#fff7ed", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: order.payment_status === "pending_terminal" ? "1px solid #a5b4fc" : "1px solid #fed7aa" }}>
+                <div style={{ fontSize: 12, color: order.payment_status === "pending_terminal" ? "#4338ca" : "#c2410c", fontWeight: 700, marginBottom: 8 }}>
+                  {order.payment_status === "pending_counter" ? "💳 Encaisser par carte" : order.payment_status === "pending_terminal" ? "📲 Confirmer Terminal Stancer" : "💶 Encaisser en espèces"}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span style={{ fontSize: 13, color: "#666" }}>Montant reçu :</span>
@@ -824,7 +844,7 @@ function RapportTab() {
     byMethod[m].count++;
     byMethod[m].amount += o.total_amount || 0;
   });
-  const methodLabels = { online: "💳 En ligne (Stancer)", card_counter: "💳 Carte comptoir", cash: "💶 Espèces", unknown: "Autre" };
+  const methodLabels = { online: "💳 En ligne (Stancer)", card_counter: "💳 Carte comptoir", cash: "💶 Espèces", card_terminal: "📲 Terminal Stancer", unknown: "Autre" };
 
   return (
     <div>
@@ -883,6 +903,129 @@ function RapportTab() {
           })()}
         </>
       )}
+    </div>
+  );
+}
+
+function WorkStationPanel() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_workstation") === "1");
+  const [pwd, setPwd] = useState("");
+  const [pwdErr, setPwdErr] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [clock, setClock] = useState("");
+
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    tick();
+    const i = setInterval(tick, 1000);
+    return () => clearInterval(i);
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
+    const poll = async () => {
+      try {
+        const r = await fetch(`${API}/api/orders?namespace=${NS}&status=pending,preparing`);
+        const d = await r.json();
+        const newOrders = (d.orders || []).filter(o => {
+          if (o.status === "picked" || o.status === "ready") return false;
+          if (o.order_source === "reservation") {
+            const items = typeof o.items === "string" ? JSON.parse(o.items || "[]") : (o.items || []);
+            return items.length > 0;
+          }
+          return ["paid", "pending_counter", "pending_cash", "pending_terminal"].includes(o.payment_status);
+        });
+        setOrders(newOrders);
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [authed]);
+
+  const handleLogin = () => {
+    if (pwd === "workstation2025") { localStorage.setItem("nr_workstation", "1"); setAuthed(true); setPwdErr(false); }
+    else setPwdErr(true);
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+        <div style={{ background: "#1e293b", borderRadius: 16, padding: 32, width: 320, textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📺</div>
+          <h2 style={{ color: "#f97316", fontSize: 22, marginBottom: 20 }}>Station · 备餐台</h2>
+          <input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdErr(false); }}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            placeholder="Mot de passe"
+            style={{ width: "100%", padding: 14, borderRadius: 10, border: pwdErr ? "2px solid #dc2626" : "1px solid #334155", background: "#0f172a", color: "white", fontSize: 16, boxSizing: "border-box", marginBottom: 12, outline: "none" }} />
+          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>Mot de passe incorrect</div>}
+          <button onClick={handleLogin} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#f97316", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Entrer</button>
+        </div>
+      </div>
+    );
+  }
+
+  const pending = orders.filter(o => o.status === "pending" || o.status === "preparing");
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "'Inter', sans-serif", color: "white" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <div style={{ background: "#f97316", padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>📺 Station · 备餐台</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20 }}>{clock}</span>
+          <button onClick={() => { localStorage.removeItem("nr_workstation"); setAuthed(false); }}
+            style={{ background: "rgba(0,0,0,0.2)", border: "none", color: "white", padding: "6px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Déconnexion</button>
+        </div>
+      </div>
+      <div style={{ padding: 20 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: 3, color: "#f97316", marginBottom: 16 }}>
+          En préparation · 待制作 ({pending.length})
+        </div>
+        {pending.length === 0 && (
+          <div style={{ textAlign: "center", padding: 80, color: "#334155", fontSize: 28 }}>Aucune commande · 暂无订单</div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
+          {pending.map(order => {
+            const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
+            const isReservation = order.order_source === "reservation";
+            return (
+              <div key={order.id} style={{ background: "#1e293b", borderRadius: 16, padding: 24, border: isReservation ? "3px solid #1d4ed8" : "3px solid #f97316" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 64, fontWeight: 900, lineHeight: 1, color: isReservation ? "#60a5fa" : "#f97316" }}>{order.order_number}</span>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 16, color: "#94a3b8" }}>{order.order_type === "dine_in" ? "🍽 Sur place" : "📦 Emporter"}</div>
+                    <div style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>
+                      {order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </div>
+                  </div>
+                </div>
+                {isReservation && (
+                  <div style={{ background: "#1e3a8a", color: "#93c5fd", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 12, display: "inline-block" }}>
+                    🔵 Réservation {order.booking_code ? `R-${order.booking_code}` : ""}
+                    {order.booking_guests ? ` · ${order.booking_guests} pers.` : ""}
+                  </div>
+                )}
+                <div>
+                  {items.map((item, i) => (
+                    <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #334155" }}>
+                      <div style={{ fontSize: 28, fontWeight: 700 }}>
+                        {item.name} <span style={{ color: "#f97316" }}>×{item.qty}</span>
+                      </div>
+                      {item.options && (
+                        <div style={{ fontSize: 18, color: "#94a3b8", marginTop: 4 }}>
+                          {Object.values(item.options).filter(Boolean).join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1535,7 +1678,7 @@ function OrderPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
-      // Step 1: create the order
+      // Create order — payment method chosen on next page
       const orderRes = await fetch(`${API}/api/order/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1550,7 +1693,7 @@ function OrderPage() {
           })),
           order_type: orderType,
           total_amount: total,
-          payment_method: paymentMethod,
+          payment_method: "pending",
         }),
       });
       const orderData = await orderRes.json();
@@ -1558,95 +1701,21 @@ function OrderPage() {
         setSubmitError(orderData.error || "Erreur création commande");
         return;
       }
-
-      if (paymentMethod === "online") {
-        // Step 2a: Stancer online payment
-        const amountCents = Math.round(total * 100);
-        const payRes = await fetch(`${API}/api/payment/create`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            namespace: NS,
-            order_id: orderData.order_id,
-            amount: amountCents,
-            description: `Neige Rouge #${orderData.order_number}`,
-          }),
-        });
-        const payData = await payRes.json();
-        if (!payData.success) {
-          setSubmitError(payData.error || "Erreur paiement");
-          return;
-        }
-        window.location.href = payData.payment_url;
-      } else {
-        // Step 2b: counter payment — show success immediately
-        setSubmittedMethod(paymentMethod);
-        setOrderNumber(orderData.order_number);
-        setSubmitted(true);
-        setShowConfirm(false);
-      }
+      // Persist order data for payment pages
+      sessionStorage.setItem("nr_pending_order_id", orderData.order_id);
+      sessionStorage.setItem("nr_pending_order_number", orderData.order_number);
+      sessionStorage.setItem("nr_pending_amount", total.toFixed(2));
+      sessionStorage.setItem("nr_pending_items", JSON.stringify(allCartItems.map(i => ({
+        name: i.name, qty: i.qty, price: i.price, options: i.options,
+      }))));
+      sessionStorage.setItem("nr_pending_lang", lang);
+      window.location.hash = `payment-method?order_id=${orderData.order_id}&amount=${total.toFixed(2)}`;
     } catch {
       setSubmitError(lang === "fr" ? "Erreur de connexion" : "网络错误");
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (submitted) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet" />
-        <div style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, color: "#8B0000", marginBottom: 8 }}>
-            {lang === "fr" ? "Commande envoyée !" : "下单成功！"}
-          </h2>
-          <div style={{ margin: "20px 0", padding: "20px 32px", background: "white", borderRadius: 16, border: "3px solid #8B0000", display: "inline-block" }}>
-            <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
-              {lang === "fr" ? "Votre numéro" : "您的取餐号"}
-            </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>{orderNumber}</div>
-            {submittedMethod === "card_counter" && (
-              <div style={{ marginTop: 10, padding: "10px 14px", background: "#fff7ed", borderRadius: 10, border: "1px solid #fdba74" }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>💳</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#c2410c" }}>{lang === "fr" ? "Veuillez payer au comptoir" : "请到柜台刷卡付款"}</div>
-              </div>
-            )}
-            {submittedMethod === "cash" && (
-              <div style={{ marginTop: 10, padding: "10px 14px", background: "#f0fdf4", borderRadius: 10, border: "1px solid #86efac" }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>💶</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#15803d" }}>{lang === "fr" ? "Veuillez payer en espèces au comptoir" : "请到柜台现金付款"}</div>
-              </div>
-            )}
-            {submittedMethod === "online" && (
-              <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
-                {lang === "fr" ? "Veuillez patienter, nous préparons votre commande" : "请稍候，我们正在准备您的餐食"}
-              </div>
-            )}
-          </div>
-          <div style={{ background: "white", borderRadius: 12, padding: 16, margin: "24px auto", textAlign: "left", border: "1px solid #eee", maxWidth: 340 }}>
-            {allCartItems.map((item, i) => (
-              <div key={item.uid || i} style={{ padding: "6px 0", fontSize: 14, borderBottom: i < allCartItems.length - 1 ? "1px solid #f0f0f0" : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>{item.name} ×{item.qty}</span>
-                  <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace" }}>{(item.price * item.qty).toFixed(2)}€</span>
-                </div>
-                {item.options && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{optStr(item.options, lang)}</div>}
-              </div>
-            ))}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #eee", fontWeight: 700 }}>
-              <span>Total</span>
-              <span style={{ color: "#8B0000", fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{total.toFixed(2)}€</span>
-            </div>
-          </div>
-          <button onClick={() => { setSubmitted(false); setCart({}); setMenuSelections([]); setOptionSelections([]); setOrderNumber(""); }}
-            style={{ padding: "12px 28px", borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#666", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-            {lang === "fr" ? "Nouvelle commande" : "再来一单"}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -1757,36 +1826,6 @@ function OrderPage() {
                 }}>{lang === "zh" ? opt.zh : opt.fr}</button>
               ))}
             </div>
-            {/* Payment method selector */}
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-              {lang === "fr" ? "Mode de paiement 付款方式" : "付款方式"}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-              {[
-                { key: "online", icon: "💳", fr: "Payer en ligne", sub: "Apple Pay / Google Pay / CB", zh: "在线付款", subZh: "Apple Pay / Google Pay / 刷卡" },
-                { key: "card_counter", icon: "💳", fr: "Carte au comptoir", sub: "Payer à la caisse par carte", zh: "到店刷卡", subZh: "到柜台刷卡付款" },
-                { key: "cash", icon: "💶", fr: "Espèces", sub: "Payer à la caisse en espèces", zh: "现金", subZh: "到柜台现金付款" },
-              ].map(opt => (
-                <button key={opt.key} onClick={() => setPaymentMethod(opt.key)} style={{
-                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
-                  border: paymentMethod === opt.key ? "2px solid #8B0000" : "1px solid #ddd",
-                  background: paymentMethod === opt.key ? "rgba(139,0,0,0.04)" : "white",
-                  cursor: "pointer",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 18 }}>{opt.icon}</span>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: paymentMethod === opt.key ? "#8B0000" : "#333" }}>
-                        {lang === "zh" ? opt.zh : opt.fr}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999", marginTop: 1 }}>
-                        {lang === "zh" ? opt.subZh : opt.sub}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
             {submitError && (
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14, marginBottom: 12 }}>{submitError}</div>
             )}
@@ -1838,6 +1877,7 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
   const timeStr = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
   const payLabel = order.payment_status === "pending_counter" ? "💳 Paiement carte comptoir"
     : order.payment_status === "pending_cash" ? "💶 Paiement espèces"
+    : order.payment_status === "pending_terminal" ? "📲 Terminal Stancer"
     : "✅ Payé en ligne";
 
   const ticketHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -2031,12 +2071,12 @@ function KitchenPanel() {
             const items = typeof o.items === "string" ? JSON.parse(o.items || "[]") : (o.items || []);
             return items.length > 0;
           }
-          return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash";
+          return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
         }));
       } catch {}
     };
     poll();
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, [authed]);
 
@@ -2178,6 +2218,15 @@ function KitchenPanel() {
                 {!isReservation && order.payment_status === "pending_cash" && (
                   <div style={{ background: "#14532d", color: "#4ade80", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💶 待现金 · En attente de paiement espèces</div>
                 )}
+                {!isReservation && order.payment_status === "pending_terminal" && (
+                  <div style={{ background: "#1e1b4b", color: "#a5b4fc", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💳 Terminal · 待刷卡机</div>
+                )}
+                {!isReservation && order.payment_status === "pending_sumup" && (
+                  <div style={{ background: "#1e3a5f", color: "#93c5fd", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>⏳ SumUp TPE · 等待确认</div>
+                )}
+                {!isReservation && order.payment_status === "unpaid_order_started" && (
+                  <div style={{ background: "#14532d", color: "#86efac", borderRadius: 8, padding: "6px 12px", fontSize: 16, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>💵 Payer lors du retrait · 取餐付</div>
+                )}
                 <div style={{ marginBottom: 12 }}>
                   {items.map((item, i) => (
                     <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #333" }}>
@@ -2192,12 +2241,13 @@ function KitchenPanel() {
                     </div>
                   ))}
                 </div>
-                {(order.payment_status === "pending_counter" || order.payment_status === "pending_cash") && (
-                  <button onClick={() => confirmPayment(order.id, order.payment_method)} style={{
+                {(order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "unpaid_order_started") && (
+                  <button onClick={() => confirmPayment(order.id, order.payment_status === "unpaid_order_started" ? "cash" : order.payment_method)} style={{
                     width: "100%", padding: 16, borderRadius: 12, border: "none", marginBottom: 10,
-                    background: "#f97316", color: "white", fontSize: 20, fontWeight: 700, cursor: "pointer",
+                    background: order.payment_status === "pending_terminal" ? "#4f46e5" : order.payment_status === "unpaid_order_started" ? "#15803d" : "#f97316",
+                    color: "white", fontSize: 20, fontWeight: 700, cursor: "pointer",
                   }}>
-                    {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : "💶 Confirmer paiement espèces · 确认收现金"}
+                    {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : order.payment_status === "pending_terminal" ? "💳 Confirmer Terminal Stancer · 确认刷卡机" : order.payment_status === "unpaid_order_started" ? "✅ Confirmer encaissement · 确认收款" : "💶 Confirmer paiement espèces · 确认收现金"}
                   </button>
                 )}
                 <div style={{ display: "flex", gap: 10 }}>
@@ -2816,6 +2866,368 @@ function BookingDepositSuccessPage({ bookingId, bookingCode }) {
 }
 
 // ---------------------------------------------------------------------------
+// PaymentMethodPage — SumUp Phase 1: choose payment method after order created
+// ---------------------------------------------------------------------------
+
+function PaymentMethodPage() {
+  const hashParams = new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf("?") + 1));
+  const orderId = hashParams.get("order_id");
+  const amount = parseFloat(hashParams.get("amount") || "0");
+  const [lang, setLang] = useState(() => sessionStorage.getItem("nr_pending_lang") || "fr");
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSelect = async (method) => {
+    setSelected(method);
+    setLoading(true);
+    setError("");
+    try {
+      const items = (() => { try { return JSON.parse(sessionStorage.getItem("nr_pending_items") || "[]"); } catch { return []; } })();
+      const res = await fetch(`${API}/api/payment/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namespace: NS,
+          order_id: orderId,
+          amount,
+          currency: "EUR",
+          payment_mode: method,
+          items,
+        }),
+      });
+      const data = await res.json();
+      if (method === "at_pickup") {
+        window.location.hash = `order-success?order_id=${orderId}&mode=cash`;
+      } else if (method === "online") {
+        if (data.hosted_checkout_url) {
+          window.location.href = data.hosted_checkout_url;
+        } else {
+          setError(lang === "fr" ? "URL de paiement introuvable" : "支付链接不可用");
+          setLoading(false);
+          setSelected(null);
+        }
+      } else if (method === "in_person_solo") {
+        window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;
+      }
+    } catch {
+      setError(lang === "fr" ? "Erreur de connexion" : "网络错误");
+      setLoading(false);
+      setSelected(null);
+    }
+  };
+
+  const methods = [
+    {
+      id: "in_person_solo",
+      icon: "💳",
+      fr: "Payer au comptoir",
+      sub_fr: "SumUp affichera automatiquement le montant",
+      zh: "到柜台支付",
+      sub_zh: "SumUp 自动弹出金额",
+      recommended: true,
+    },
+    {
+      id: "online",
+      icon: "📱",
+      fr: "Paiement en ligne",
+      sub_fr: "Apple Pay / Google Pay / Carte bancaire",
+      zh: "在线支付",
+      sub_zh: "Apple Pay / Google Pay / 信用卡",
+      recommended: false,
+    },
+    {
+      id: "at_pickup",
+      icon: "💵",
+      fr: "Payer à la livraison",
+      sub_fr: "Espèces ou carte au comptoir lors du retrait",
+      zh: "取餐时付款",
+      sub_zh: "取餐时现金或刷卡",
+      recommended: false,
+    },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <div style={{ background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", padding: "16px 20px", textAlign: "center", position: "relative" }}>
+        <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{
+          position: "absolute", top: 14, right: 16,
+          background: "rgba(255,255,255,0.15)", border: "none", color: "rgba(255,255,255,0.9)",
+          padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>{lang === "fr" ? "中文" : "Français"}</button>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, color: "white", margin: 0 }}>
+          {lang === "fr" ? "Choisissez votre paiement" : "请选择支付方式"}
+        </h1>
+      </div>
+
+      <div style={{ textAlign: "center", padding: "24px 16px 16px" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000" }}>
+          {amount.toFixed(2)}€
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 16px 40px" }}>
+        {methods.map(opt => (
+          <button
+            key={opt.id}
+            disabled={loading}
+            onClick={() => handleSelect(opt.id)}
+            style={{
+              width: "100%", padding: "16px 14px", borderRadius: 14, textAlign: "left",
+              border: selected === opt.id ? "2px solid #8B0000" : "1.5px solid #ddd",
+              background: selected === opt.id ? "rgba(139,0,0,0.04)" : "white",
+              cursor: loading ? "default" : "pointer",
+              marginBottom: 12,
+              opacity: loading && selected !== opt.id ? 0.5 : 1,
+              display: "block",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 28 }}>{opt.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 700, fontSize: 16, color: selected === opt.id ? "#8B0000" : "#333" }}>
+                    {lang === "zh" ? opt.zh : opt.fr}
+                  </span>
+                  {opt.recommended && (
+                    <span style={{ background: "#fbbf24", color: "#1f2937", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8 }}>
+                      ⭐ {lang === "zh" ? "推荐" : "Recommandé"}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "#888", marginTop: 3 }}>
+                  {lang === "zh" ? opt.sub_zh : opt.sub_fr}
+                </div>
+              </div>
+              {loading && selected === opt.id && (
+                <div style={{ fontSize: 18, color: "#8B0000" }}>⏳</div>
+              )}
+            </div>
+          </button>
+        ))}
+
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 14, marginTop: 4 }}>
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WaitingForPaymentPage — poll for SumUp in_person_solo confirmation
+// ---------------------------------------------------------------------------
+
+function WaitingForPaymentPage() {
+  const hashParams = new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf("?") + 1));
+  const orderId = hashParams.get("order_id");
+  const amount = parseFloat(hashParams.get("amount") || "0");
+  const orderNumber = sessionStorage.getItem("nr_pending_order_number") || "";
+  const [lang] = useState(() => sessionStorage.getItem("nr_pending_lang") || "fr");
+  const [status, setStatus] = useState("waiting");
+  const [mockTriggering, setMockTriggering] = useState(false);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/api/order/${orderId}/status?namespace=${NS}`);
+        const data = await res.json();
+        if (data.status === "paid") {
+          setStatus("paid");
+          clearInterval(interval);
+          setTimeout(() => {
+            window.location.hash = `order-success?order_id=${orderId}&mode=sumup`;
+          }, 2000);
+        } else if (data.status === "failed") {
+          setStatus("failed");
+          clearInterval(interval);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [orderId]);
+
+  const triggerMock = async () => {
+    if (!DEMO_MODE || !orderId) return;
+    setMockTriggering(true);
+    try {
+      await fetch(`${API}/api/dev/mock-payment-success/${NS}/${orderId}`, { method: "POST" });
+    } catch {} finally {
+      setMockTriggering(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <style>{`@keyframes nr-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      <div style={{ textAlign: "center", padding: "32px 24px", maxWidth: 420, width: "100%" }}>
+
+        {status === "waiting" && (
+          <>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>💳</div>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, color: "#8B0000", marginBottom: 12 }}>
+              {lang === "fr" ? "Veuillez payer au comptoir" : "请到柜台贴卡"}
+            </h1>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 700, color: "#8B0000", marginBottom: 12 }}>
+              {amount.toFixed(2)}€
+            </div>
+            <p style={{ color: "#666", marginBottom: 4 }}>
+              {lang === "fr" ? "SumUp TPE a affiché le montant" : "SumUp TPE 已弹出金额"}
+            </p>
+            {orderNumber && (
+              <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
+                {lang === "fr" ? `Commande : #${orderNumber}` : `订单号: #${orderNumber}`}
+              </p>
+            )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#aaa", fontSize: 15, marginBottom: 32 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#8B0000", animation: "nr-pulse 1.5s ease-in-out infinite" }} />
+              {lang === "fr" ? "En attente de confirmation..." : "等待确认..."}
+            </div>
+
+            {DEMO_MODE && (
+              <button
+                onClick={triggerMock}
+                disabled={mockTriggering}
+                style={{
+                  width: "100%", padding: 18, borderRadius: 14, border: "none",
+                  background: mockTriggering ? "#fde68a" : "linear-gradient(135deg, #f59e0b, #d97706)",
+                  color: "#1f2937", fontSize: 17, fontWeight: 700, cursor: mockTriggering ? "default" : "pointer",
+                }}
+              >
+                {mockTriggering ? "..." : (lang === "fr" ? "🎬 Demo: Simuler paiement réussi" : "🎬 Demo: 模拟支付成功")}
+              </button>
+            )}
+
+            <button
+              onClick={() => { window.location.hash = `payment-method?order_id=${orderId}&amount=${amount}`; }}
+              style={{ marginTop: 12, width: "100%", padding: 14, borderRadius: 12, border: "1.5px solid #ddd", background: "white", color: "#666", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+            >
+              {lang === "fr" ? "Changer de méthode" : "换支付方式"}
+            </button>
+          </>
+        )}
+
+        {status === "paid" && (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: "#16a34a", marginBottom: 12 }}>
+              {lang === "fr" ? "Paiement réussi !" : "支付成功！"}
+            </h1>
+            <p style={{ color: "#666" }}>{lang === "fr" ? "Redirection en cours..." : "正在跳转..."}</p>
+          </>
+        )}
+
+        {status === "failed" && (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>❌</div>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: "#dc2626", marginBottom: 16 }}>
+              {lang === "fr" ? "Échec du paiement" : "支付失败"}
+            </h1>
+            <button
+              onClick={() => { window.location.hash = `payment-method?order_id=${orderId}&amount=${amount}`; }}
+              style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}
+            >
+              {lang === "fr" ? "Changer de méthode" : "换支付方式"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OrderSuccessPage — final confirmation screen (SumUp / at_pickup)
+// ---------------------------------------------------------------------------
+
+function OrderSuccessPage() {
+  const hashParams = new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf("?") + 1));
+  const mode = hashParams.get("mode") || "sumup";
+  const orderNumber = sessionStorage.getItem("nr_pending_order_number") || "";
+  const amount = parseFloat(sessionStorage.getItem("nr_pending_amount") || "0");
+  const [lang] = useState(() => sessionStorage.getItem("nr_pending_lang") || "fr");
+  const isPaid = mode === "sumup" || mode === "online";
+  const isCash = mode === "cash";
+
+  let items = [];
+  try { items = JSON.parse(sessionStorage.getItem("nr_pending_items") || "[]"); } catch {}
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f0fdf4 0%, #faf8f5 100%)", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: "40px 16px 60px" }}>
+
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 64, marginBottom: 12 }}>✅</div>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: "#8B0000", marginBottom: 12 }}>
+            {lang === "fr" ? "Commande confirmée !" : "下单成功！"}
+          </h1>
+          {isPaid && (
+            <div style={{ display: "inline-block", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "8px 16px", color: "#15803d", fontSize: 14, fontWeight: 600 }}>
+              🟢 {lang === "fr" ? "Paiement confirmé" : "已付款"}
+            </div>
+          )}
+          {isCash && (
+            <div style={{ display: "inline-block", background: "#fefce8", border: "1px solid #fde047", borderRadius: 10, padding: "8px 16px", color: "#854d0e", fontSize: 14, fontWeight: 600 }}>
+              💵 {lang === "fr" ? "À payer lors du retrait" : "取餐时付款"}
+            </div>
+          )}
+        </div>
+
+        {orderNumber && (
+          <div style={{ textAlign: "center", marginBottom: 24, padding: "20px 32px", background: "white", borderRadius: 16, border: "3px solid #8B0000" }}>
+            <div style={{ fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+              {lang === "fr" ? "Votre numéro" : "您的取餐号"}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>
+              {orderNumber}
+            </div>
+            {isCash && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#854d0e", fontWeight: 600 }}>
+                {lang === "fr" ? "Présentez ce numéro au comptoir pour payer" : "到柜台出示此号并付款"}
+              </div>
+            )}
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 24, border: "1px solid #eee" }}>
+            {items.map((item, i) => (
+              <div key={i} style={{ padding: "10px 0", borderBottom: i < items.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14 }}>{item.name} ×{item.qty}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600, fontSize: 14 }}>
+                    {(item.price * item.qty).toFixed(2)}€
+                  </span>
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 8px", borderTop: "2px solid #8B0000" }}>
+              <span style={{ fontWeight: 700 }}>Total</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#8B0000" }}>
+                {amount.toFixed(2)}€
+              </span>
+            </div>
+          </div>
+        )}
+
+        <a href="#" style={{
+          display: "block", textAlign: "center", padding: "14px 28px", borderRadius: 12,
+          background: "#8B0000", color: "white", fontSize: 15, fontWeight: 600, textDecoration: "none",
+        }}>
+          ← {lang === "fr" ? "Retour à l'accueil" : "返回首页"}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -2833,16 +3245,20 @@ export default function App() {
   }, []);
 
   const { path: route, params } = routeInfo;
-  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success"];
+  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success", "payment-method", "payment-waiting", "order-success"];
   // Kitchen and admin don't need install prompt
   if (route === "admin") return <AdminPanel />;
   if (route === "kitchen") return <KitchenPanel />;
+  if (route === "workstation" && F.workStation) return <WorkStationPanel />;
   return (
     <>
       {route === "order" && <OrderPage />}
       {route === "menu" && <MenuPage />}
       {route === "payment-success" && <PaymentSuccessPage orderId={params.get("order_id")} />}
       {route === "booking-success" && <BookingDepositSuccessPage bookingId={params.get("booking_id")} bookingCode={params.get("booking_code")} />}
+      {route === "payment-method" && <PaymentMethodPage />}
+      {route === "payment-waiting" && <WaitingForPaymentPage />}
+      {route === "order-success" && <OrderSuccessPage />}
       {!hiddenRoutes.includes(route) && <LandingPage />}
       <InstallPrompt />
     </>
