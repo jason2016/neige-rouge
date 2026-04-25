@@ -2944,7 +2944,8 @@ function PaymentMethodPage() {
       sub_zh: "Apple Pay / Google Pay / 信用卡",
       recommended: false,
     },
-    {
+    // at_pickup: réservations uniquement — masqué jusqu'à activation de F.bookings
+    ...(F.bookings ? [{
       id: "at_pickup",
       icon: "💵",
       fr: "Payer à la livraison",
@@ -2952,7 +2953,7 @@ function PaymentMethodPage() {
       zh: "取餐时付款",
       sub_zh: "取餐时现金或刷卡",
       recommended: false,
-    },
+    }] : []),
   ];
 
   return (
