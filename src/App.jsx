@@ -2152,7 +2152,8 @@ function KitchenPanel() {
     );
   }
 
-  const pendingOrders = orders.filter(o => o.status === "pending" || o.status === "preparing");
+  const pendingOrders = orders.filter(o => o.status === "pending" || o.status === "preparing")
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const readyOrders = orders.filter(o => o.status === "ready");
 
   return (
