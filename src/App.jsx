@@ -3036,13 +3036,15 @@ function WaitingForPaymentPage() {
       try {
         const res = await fetch(`${API}/api/order/${orderId}/status?namespace=${NS}`);
         const data = await res.json();
-        if (data.status === "paid") {
+        // Accept either "status" or "payment_status" field from backend
+        const orderStatus = data.status || data.payment_status;
+        if (orderStatus === "paid") {
           setStatus("paid");
           clearInterval(interval);
           setTimeout(() => {
             window.location.hash = `order-success?order_id=${orderId}&mode=sumup`;
           }, 2000);
-        } else if (data.status === "failed") {
+        } else if (orderStatus === "failed" || orderStatus === "cancelled") {
           setStatus("failed");
           clearInterval(interval);
         }
@@ -3055,8 +3057,9 @@ function WaitingForPaymentPage() {
     if (!DEMO_MODE || !orderId) return;
     setMockTriggering(true);
     try {
-      await fetch(`${API}/api/dev/mock-payment-success/${NS}/${orderId}`, { method: "POST" });
-    } catch {} finally {
+      const res = await fetch(`${API}/api/dev/mock-payment-success/${NS}/${orderId}`, { method: "POST" });
+      if (!res.ok) console.warn("[demo] mock trigger failed", res.status, await res.text().catch(() => ""));
+    } catch (e) { console.warn("[demo] mock trigger error", e); } finally {
       setMockTriggering(false);
     }
   };
