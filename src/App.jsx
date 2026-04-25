@@ -2250,6 +2250,14 @@ function KitchenPanel() {
                     {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : order.payment_status === "pending_terminal" ? "💳 Confirmer Terminal Stancer · 确认刷卡机" : order.payment_status === "unpaid_order_started" ? "✅ Confirmer encaissement · 确认收款" : "💶 Confirmer paiement espèces · 确认收现金"}
                   </button>
                 )}
+                {DEMO_MODE && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "pending_sumup") && (
+                  <button
+                    onClick={() => fetch(`${API}/api/dev/mock-payment-success/${NS}/${order.id}`, { method: "POST" }).catch(() => {})}
+                    style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", marginBottom: 10, background: "#fbbf24", color: "#1f2937", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    🎬 Demo: Simuler paiement SumUp
+                  </button>
+                )}
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => openTicketForOrder(order)} style={{
                     flex: 1, padding: 14, borderRadius: 12, border: "none",
