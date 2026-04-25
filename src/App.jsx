@@ -1608,9 +1608,7 @@ function OrderPage() {
   }, []);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderType, setOrderType] = useState("dine_in");
-  const [paymentMethod, setPaymentMethod] = useState("online");
   const [submitted, setSubmitted] = useState(false);
-  const [submittedMethod, setSubmittedMethod] = useState("online");
   const [orderNumber, setOrderNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -1874,10 +1872,13 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
   const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items || [];
   const now = new Date();
   const timeStr = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-  const payLabel = order.payment_status === "pending_counter" ? "💳 Paiement carte comptoir"
+  const payLabel = order.payment_status === "paid" ? "✅ Payé"
+    : order.payment_status === "pending_sumup" ? "⏳ SumUp TPE · En attente"
+    : order.payment_status === "pending_counter" ? "💳 Paiement carte comptoir"
     : order.payment_status === "pending_cash" ? "💶 Paiement espèces"
     : order.payment_status === "pending_terminal" ? "📲 Terminal Stancer"
-    : "✅ Payé en ligne";
+    : order.payment_status === "unpaid_order_started" ? "💵 Paiement au retrait"
+    : "⏳ En attente de paiement";
 
   const ticketHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>
@@ -2077,7 +2078,7 @@ function KitchenPanel() {
             const items = typeof o.items === "string" ? JSON.parse(o.items || "[]") : (o.items || []);
             return items.length > 0;
           }
-          return o.payment_status === "paid" || o.payment_status === "pending" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
+          return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
         }));
       } catch {}
     };
@@ -2257,7 +2258,7 @@ function KitchenPanel() {
                     {order.payment_status === "pending_counter" ? "💳 Confirmer paiement carte · 确认刷卡" : order.payment_status === "pending_terminal" ? "💳 Confirmer Terminal Stancer · 确认刷卡机" : order.payment_status === "unpaid_order_started" ? "✅ Confirmer encaissement · 确认收款" : "💶 Confirmer paiement espèces · 确认收现金"}
                   </button>
                 )}
-                {DEMO_MODE && (order.payment_status === "pending" || order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "pending_sumup") && (
+                {DEMO_MODE && (order.payment_status === "pending_counter" || order.payment_status === "pending_cash" || order.payment_status === "pending_terminal" || order.payment_status === "pending_sumup") && (
                   <button
                     onClick={() => fetch(`${API}/api/dev/mock-payment-success/${NS}/${order.id}`, { method: "POST" }).catch(() => {})}
                     style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", marginBottom: 10, background: "#fbbf24", color: "#1f2937", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
