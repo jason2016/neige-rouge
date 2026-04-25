@@ -2030,7 +2030,9 @@ function KitchenPanel() {
         const newOrders = data.orders || [];
 
         // Detect new pending orders → auto-show ticket modal
-        const pendingOrders = newOrders.filter(o => o.status === "pending");
+        // Only trigger for orders where payment method has been chosen (not bare "pending")
+        const POPUP_STATUSES = new Set(["paid", "pending_sumup", "pending_counter", "pending_cash", "pending_terminal", "unpaid_order_started"]);
+        const pendingOrders = newOrders.filter(o => o.status === "pending" && POPUP_STATUSES.has(o.payment_status));
         const pendingIds = new Set(pendingOrders.map(o => o.id));
         const readyIds = new Set(newOrders.filter(o => o.status === "ready").map(o => o.id));
 
