@@ -2912,6 +2912,7 @@ function PaymentMethodPage() {
           currency: "EUR",
           payment_mode: method,
           items,
+          return_url: `${window.location.origin}${window.location.pathname}#order-success?order_id=${orderId}&mode=sumup`,
         }),
       });
       const data = await res.json();
