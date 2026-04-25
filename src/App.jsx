@@ -1693,7 +1693,6 @@ function OrderPage() {
           })),
           order_type: orderType,
           total_amount: total,
-          payment_method: "pending",
         }),
       });
       const orderData = await orderRes.json();
@@ -2896,13 +2895,6 @@ function PaymentMethodPage() {
 
   const handleSelect = async (method) => {
     setSelected(method);
-    // For in_person_solo: navigate to waiting screen immediately without calling /api/payment/create.
-    // The order stays in its initial pending state so the kitchen can show the demo confirm button.
-    // Phase 2: WaitingForPaymentPage will initiate the SumUp TPE transaction on mount.
-    if (method === "in_person_solo") {
-      window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;
-      return;
-    }
     setLoading(true);
     setError("");
     try {
@@ -2920,7 +2912,10 @@ function PaymentMethodPage() {
         }),
       });
       const data = await res.json();
-      if (method === "at_pickup") {
+      if (method === "in_person_solo") {
+        // Backend sets payment_status="pending_sumup"; customer waits while kitchen sees ⏳ badge
+        window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;
+      } else if (method === "at_pickup") {
         window.location.hash = `order-success?order_id=${orderId}&mode=cash`;
       } else if (method === "online") {
         const url = data.payment_url || data.hosted_checkout_url;
@@ -2958,8 +2953,7 @@ function PaymentMethodPage() {
       sub_zh: "Apple Pay / Google Pay / 信用卡",
       recommended: false,
     },
-    // at_pickup: réservations uniquement — masqué jusqu'à activation de F.bookings
-    ...(F.bookings ? [{
+    {
       id: "at_pickup",
       icon: "💵",
       fr: "Payer à la livraison",
@@ -2967,7 +2961,7 @@ function PaymentMethodPage() {
       zh: "取餐时付款",
       sub_zh: "取餐时现金或刷卡",
       recommended: false,
-    }] : []),
+    },
   ];
 
   return (
