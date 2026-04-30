@@ -1706,7 +1706,7 @@ function OrderPage() {
         name: i.name, qty: i.qty, price: i.price, options: i.options,
       }))));
       sessionStorage.setItem("nr_pending_lang", lang);
-      window.location.hash = `payment-method?order_id=${orderData.order_id}&amount=${total.toFixed(2)}`;
+      window.location.hash = `pending-counter?order_id=${orderData.order_id}&amount=${total.toFixed(2)}`;
     } catch {
       setSubmitError(lang === "fr" ? "Erreur de connexion" : "网络错误");
     } finally {
@@ -3039,6 +3039,95 @@ function PaymentMethodPage() {
 }
 
 // ---------------------------------------------------------------------------
+// PendingCounterPayment — customer-facing "please pay at the counter" screen
+// ---------------------------------------------------------------------------
+
+function PendingCounterPayment() {
+  const hashParams = new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf("?") + 1));
+  const amount = parseFloat(hashParams.get("amount") || "0");
+  const orderNumber = sessionStorage.getItem("nr_pending_order_number") || "";
+  const [lang] = useState(() => sessionStorage.getItem("nr_pending_lang") || "fr");
+
+  let items = [];
+  try { items = JSON.parse(sessionStorage.getItem("nr_pending_items") || "[]"); } catch {}
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+      <div style={{ background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", padding: "16px 20px", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 900, color: "white", margin: 0 }}>
+          Neige Rouge
+        </h1>
+      </div>
+
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: "32px 16px 60px" }}>
+
+        {orderNumber && (
+          <div style={{ textAlign: "center", marginBottom: 24, padding: "16px 32px", background: "white", borderRadius: 16, border: "3px solid #8B0000" }}>
+            <div style={{ fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+              {lang === "fr" ? "Votre numéro" : "您的取餐号"}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 56, fontWeight: 700, color: "#8B0000" }}>
+              {orderNumber}
+            </div>
+          </div>
+        )}
+
+        <div style={{
+          textAlign: "center",
+          padding: "28px 20px",
+          background: "#fef3c7",
+          border: "2px solid #d4a017",
+          borderRadius: 16,
+          marginBottom: 24,
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>💳</div>
+          <p style={{ margin: "0 0 8px 0", fontWeight: 700, fontSize: 22, color: "#92400e" }}>
+            {lang === "fr" ? "Veuillez payer au comptoir" : "请到前台刷卡"}
+          </p>
+          <p style={{ margin: 0, fontSize: 16, color: "#78350f" }}>
+            {lang === "fr" ? "请到前台刷卡" : "Veuillez payer au comptoir"}
+          </p>
+        </div>
+
+        <div style={{ textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 48, fontWeight: 700, color: "#8B0000", marginBottom: 24 }}>
+          {amount.toFixed(2)} €
+        </div>
+
+        {items.length > 0 && (
+          <div style={{ background: "white", borderRadius: 14, padding: "4px 16px", marginBottom: 24, border: "1px solid #eee" }}>
+            {items.map((item, i) => (
+              <div key={i} style={{ padding: "10px 0", borderBottom: i < items.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14 }}>{item.name} ×{item.qty}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 600, fontSize: 14 }}>
+                    {(item.price * item.qty).toFixed(2)}€
+                  </span>
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 8px", borderTop: "2px solid #8B0000" }}>
+              <span style={{ fontWeight: 700 }}>Total</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#8B0000" }}>
+                {amount.toFixed(2)}€
+              </span>
+            </div>
+          </div>
+        )}
+
+        <p style={{ textAlign: "center", color: "#999", fontSize: 13 }}>
+          {lang === "fr"
+            ? "Votre commande sera préparée après paiement"
+            : "付款后开始制作"}
+          <br />
+          {lang === "fr" ? "付款后开始制作" : "Votre commande sera préparée après paiement"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // WaitingForPaymentPage — poll for SumUp in_person_solo confirmation
 // ---------------------------------------------------------------------------
 
@@ -3269,7 +3358,7 @@ export default function App() {
   }, []);
 
   const { path: route, params } = routeInfo;
-  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success", "payment-method", "payment-waiting", "order-success"];
+  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success", "payment-method", "payment-waiting", "order-success", "pending-counter"];
   // Kitchen and admin don't need install prompt
   if (route === "admin") return <AdminPanel />;
   if (route === "kitchen") return <KitchenPanel />;
@@ -3283,6 +3372,7 @@ export default function App() {
       {route === "payment-method" && <PaymentMethodPage />}
       {route === "payment-waiting" && <WaitingForPaymentPage />}
       {route === "order-success" && <OrderSuccessPage />}
+      {route === "pending-counter" && <PendingCounterPayment />}
       {!hiddenRoutes.includes(route) && <LandingPage />}
       <InstallPrompt />
     </>
