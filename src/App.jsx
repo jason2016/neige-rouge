@@ -817,6 +817,115 @@ function StockTab() {
   );
 }
 
+function PendingPaymentsTab() {
+  const today = new Date().toISOString().split("T")[0];
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState({});
+
+  const fetchPending = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${today}`);
+      const data = await res.json();
+      const all = data.orders || [];
+      setOrders(all.filter(o => o.payment_status === "pending_counter"));
+    } catch { setOrders([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchPending();
+    const id = setInterval(fetchPending, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  const markPaid = async (order) => {
+    if (!window.confirm(`确认已收到客人前台刷卡？\nCommande #${order.order_number} — ${(order.total_amount || 0).toFixed(2)} €`)) return;
+    setConfirming(p => ({ ...p, [order.id]: true }));
+    try {
+      const res = await fetch(`${API}/api/order/${order.id}/confirm-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, payment_method: "card_counter", amount_received: order.total_amount || 0 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(prev => prev.filter(o => o.id !== order.id));
+      } else {
+        alert(data.error || "Erreur");
+      }
+    } catch { alert("Erreur connexion"); }
+    setConfirming(p => ({ ...p, [order.id]: false }));
+  };
+
+  const fmtTime = (iso) => {
+    const d = new Date(iso);
+    return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>💳 待前台刷卡</h2>
+          <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
+            {orders.length} commande{orders.length !== 1 ? "s" : ""} · auto-refresh 10s
+          </p>
+        </div>
+        <button onClick={fetchPending} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 14 }}>🔄</button>
+      </div>
+
+      {loading && orders.length === 0 && (
+        <p style={{ textAlign: "center", color: "#999", padding: "40px 0" }}>Chargement...</p>
+      )}
+
+      {!loading && orders.length === 0 && (
+        <div style={{ textAlign: "center", color: "#999", padding: "60px 20px" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+          <p style={{ margin: 0, fontSize: 15 }}>Aucun paiement en attente</p>
+          <p style={{ margin: "4px 0 0", fontSize: 13 }}>暂无待前台刷卡订单</p>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {orders.map(order => (
+          <div key={order.id} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 16px",
+            background: "#fef3c7", border: "1.5px solid #d4a017", borderRadius: 12,
+          }}>
+            <div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: "#8B0000" }}>
+                #{order.order_number}
+              </div>
+              <div style={{ fontSize: 13, color: "#78350f", marginTop: 2 }}>
+                {order.order_type === "dine_in" ? "🪑 Sur place" : "🥡 À emporter"}
+                {order.created_at ? ` · ${fmtTime(order.created_at)}` : ""}
+              </div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 26, fontWeight: 700, color: "#92400e", marginTop: 6 }}>
+                {(order.total_amount || 0).toFixed(2)} €
+              </div>
+            </div>
+            <button
+              onClick={() => markPaid(order)}
+              disabled={confirming[order.id]}
+              style={{
+                padding: "14px 20px", fontSize: 15, fontWeight: 700,
+                background: confirming[order.id] ? "#86efac" : "#22c55e",
+                color: "white", border: "none", borderRadius: 10, cursor: "pointer",
+                minWidth: 90, transition: "background 0.15s",
+              }}
+            >
+              {confirming[order.id] ? "..." : "✓ 已收款"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RapportTab() {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
@@ -1160,6 +1269,7 @@ function AdminPanel() {
       <div style={{ display: "flex", borderBottom: "2px solid #eee", background: "white", position: "sticky", top: 0, zIndex: 10 }}>
         {[
           { key: "commandes", label: "Commandes 订单" },
+          { key: "pending", label: "💳 待付款" },
           { key: "stock", label: "Stock 库存" },
           { key: "rapport", label: "Rapport 日报" },
         ].map(tb => (
@@ -1175,6 +1285,7 @@ function AdminPanel() {
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
 
         {tab === "commandes" && <CommandesTab />}
+        {tab === "pending" && <PendingPaymentsTab />}
         {tab === "stock" && <StockTab />}
         {tab === "rapport" && <RapportTab />}
         {tab === "reservations" && <>
