@@ -708,6 +708,28 @@ function StockTab() {
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [msg, setMsg] = useState("");
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/api/settings?namespace=${NS}`)
+      .then(r => r.json())
+      .then(d => setInventoryEnabled(d.settings?.inventory_enabled === "true" || d.settings?.inventory_enabled === true))
+      .catch(() => {});
+  }, []);
+
+  const toggleInventory = async () => {
+    const newValue = !inventoryEnabled;
+    setInventoryEnabled(newValue);
+    try {
+      await fetch(`${API}/api/settings/set`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namespace: NS, key: "inventory_enabled", value: newValue ? "true" : "false" }),
+      });
+    } catch {
+      setInventoryEnabled(!newValue);
+      alert("操作失败 / Erreur réseau");
+    }
+  };
 
   const allSections = [
     { title: "Menu Bento", items: MENU.menus },
@@ -770,6 +792,19 @@ function StockTab() {
 
   return (
     <div>
+      <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#92400e" }}>Gestion du stock · 库存管理</div>
+          <div style={{ fontSize: 12, color: "#a16207", marginTop: 2 }}>{inventoryEnabled ? "Actif · 已启用 — les limites sont appliquées" : "Désactivé · 已停用 — aucune limite n'est appliquée"}</div>
+        </div>
+        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: inventoryEnabled ? "#166534" : "#6b7280" }}>{inventoryEnabled ? "ON" : "OFF"}</span>
+          <div onClick={toggleInventory} style={{ position: "relative", width: 44, height: 24, borderRadius: 12, background: inventoryEnabled ? "#16a34a" : "#d1d5db", transition: "background 0.2s", cursor: "pointer", flexShrink: 0 }}>
+            <div style={{ position: "absolute", top: 2, left: inventoryEnabled ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left 0.2s" }} />
+          </div>
+        </label>
+      </div>
+      <div style={{ opacity: inventoryEnabled ? 1 : 0.45, pointerEvents: inventoryEnabled ? "auto" : "none", transition: "opacity 0.2s" }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd", fontSize: 14, outline: "none" }} />
@@ -813,6 +848,7 @@ function StockTab() {
           })}
         </div>
       ))}
+      </div>
     </div>
   );
 }
