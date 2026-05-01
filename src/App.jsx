@@ -1809,6 +1809,12 @@ function OrderPage() {
         setSubmitError(orderData.error || "Erreur création commande");
         return;
       }
+      // Set payment_status=pending_counter so kitchen sees the order
+      await fetch(`${API}/api/neige-rouge/orders/${orderData.order_id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_method: "card_counter" }),
+      }).catch(() => {}); // non-fatal: customer still goes to counter screen
       // Persist order data for payment pages
       sessionStorage.setItem("nr_pending_order_id", orderData.order_id);
       sessionStorage.setItem("nr_pending_order_number", orderData.order_number);
