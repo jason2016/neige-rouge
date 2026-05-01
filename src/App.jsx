@@ -263,7 +263,7 @@ const LOGO_URL = "https://focusingpro.s3.amazonaws.com/FutuShow/system/images/sY
 const RESTAURANT_INFO = {
   name: "NEIGE ROUGE 红雪",
   subtitle: "Cuisine Vietnamienne Authentique",
-  address: "75 Rue Buffon, 75005 Paris",
+  address: "7 rue des Ursulines, 75005 Paris",
   phone: "01 72 60 48 89",
   siret: "82207280700016",
   tva_dine_in: 0.10,
@@ -2013,7 +2013,7 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
   .footer { font-size: 11px; text-align: center; margin-top: 8px; }
 </style></head><body>
 <div class="center bold" style="font-size:15px;">NEIGE ROUGE 红雪</div>
-<div class="center" style="font-size:11px;">75 Rue Buffon, 75005 Paris</div>
+<div class="center" style="font-size:11px;">7 rue des Ursulines, 75005 Paris</div>
 <div class="divider"></div>
 <div class="big">${order.order_number}</div>
 <div class="center" style="margin-bottom:4px;">${order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
@@ -2052,7 +2052,7 @@ ${item.options ? `<div class="opt">${Object.values(item.options).filter(Boolean)
         {/* Ticket preview */}
         <div style={{ background: "#fff", margin: 16, borderRadius: 10, padding: "14px 16px", fontFamily: "'Courier New', monospace", fontSize: 13, color: "#000" }}>
           <div style={{ textAlign: "center", fontWeight: 700, fontSize: 15 }}>NEIGE ROUGE 红雪</div>
-          <div style={{ textAlign: "center", fontSize: 11, color: "#555" }}>75 Rue Buffon, 75005 Paris</div>
+          <div style={{ textAlign: "center", fontSize: 11, color: "#555" }}>7 rue des Ursulines, 75005 Paris</div>
           <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
           <div style={{ textAlign: "center", fontSize: 36, fontWeight: 700, color: "#8B0000", margin: "6px 0" }}>{order.order_number}</div>
           <div style={{ textAlign: "center", fontSize: 13, marginBottom: 4 }}>{order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
