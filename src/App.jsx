@@ -2164,7 +2164,7 @@ function KitchenPanel() {
             if (!orderIdsRef.current.has(order.id)) {
               hasNew = true;
               if (!printedIdsRef.current.has(order.id)) {
-                setTicketOrder(prev => prev || order);
+                markPrinted(order.id); // auto-mark without popup
               }
             }
           }
@@ -2294,14 +2294,12 @@ function KitchenPanel() {
   return (
     <div style={{ height: "100vh", overflow: "hidden", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white", display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
-      <style>{`@keyframes flashBg { 0%, 100% { background: #ef4444; } 50% { background: #991b1b; } } .flash-red { animation: flashBg 0.8s infinite; }`}</style>
-
-      <KitchenTicketModal
-        order={ticketOrder}
-        onPrint={handlePrintAndClose}
-        onSkip={handleSkipAndClose}
-        onLater={() => setTicketOrder(null)}
-      />
+      <style>{`
+        @keyframes flashBg { 0%, 100% { background: #ef4444; } 50% { background: #991b1b; } }
+        .flash-red { animation: flashBg 0.8s infinite; }
+        @keyframes newOrderPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,160,23,0); } 50% { box-shadow: 0 0 0 3px rgba(212,160,23,0.8); } }
+        .new-order-pulse { animation: newOrderPulse 1s ease-in-out 3; }
+      `}</style>
 
       {/* Header */}
       <div style={{ padding: "5px 12px", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
@@ -2337,6 +2335,8 @@ function KitchenPanel() {
           const btnColor = isReady ? "#ef4444" : isUnpaid ? "#1a1a1a" : "white";
           const btnLabel = isReady ? "🔔 Terminé" : isUnpaid ? "💳 Encaisser" : "⏱ En cours";
 
+          const isNew = order.created_at && (Date.now() - new Date(order.created_at).getTime()) < 30000;
+
           const handleAction = () => {
             if (isReady) markPicked(order.id);
             else if (isUnpaid) confirmPayment(order.id, "card_counter");
@@ -2344,13 +2344,22 @@ function KitchenPanel() {
           };
 
           return (
-            <div key={order.id} className={isReady ? "flash-red" : ""} style={{
+            <div key={order.id} className={isReady ? "flash-red" : isNew ? "new-order-pulse" : ""} style={{
               padding: "6px",
               borderRadius: "5px",
               borderLeft: `3px solid ${borderColor}`,
               background: isReady ? undefined : "#2d2d2d",
               color: "white",
+              position: "relative",
             }}>
+              {isNew && !isReady && (
+                <span style={{
+                  position: "absolute", top: -6, right: -6,
+                  background: "#d4a017", color: "#1a1a1a",
+                  padding: "2px 6px", borderRadius: 10,
+                  fontSize: "9px", fontWeight: 700, zIndex: 10,
+                }}>NEW</span>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "3px" }}>
                 <span style={{ fontSize: "18px", fontWeight: 500, color: isReady ? "white" : "#d4a017" }}>{order.order_number}</span>
                 <span style={{ fontSize: "13px", fontWeight: 500, color: priceColor }}>{(order.total_amount || 0).toFixed(2)} €</span>
@@ -3198,6 +3207,14 @@ function PendingCounterPayment() {
           <br />
           {lang === "fr" ? "付款后开始制作" : "Votre commande sera préparée après paiement"}
         </p>
+
+        <a href="#order" style={{
+          marginTop: 24, display: "block", textAlign: "center",
+          padding: "14px 24px", fontSize: 16, fontWeight: 500,
+          background: "#7a1c1c", color: "white", borderRadius: 8, textDecoration: "none",
+        }}>
+          🍽 {lang === "fr" ? "Continuer · 继续点餐" : "继续点餐 · Continuer"}
+        </a>
       </div>
     </div>
   );
