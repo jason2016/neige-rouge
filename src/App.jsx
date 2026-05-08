@@ -21,12 +21,12 @@ const MENU = {
     { id: "B", name: "Menu B", desc: "2 Nems poulet ou salade d'algues + poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "2个鸡肉春卷或海藻沙拉 + 脆皮鸡/焦糖猪肉/叉烧 + 面或饭", price: 10.00 },
     { id: "C", name: "Menu C", desc: "Poulet croustillant + Porc caramel ou porc laqué ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "脆皮鸡 + 焦糖猪肉/叉烧/2个虾卷 + 面或饭", price: 11.00 },
     { id: "D", name: "Menu D", desc: "Poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "脆皮鸡或焦糖猪肉或叉烧 + 面或饭", price: 8.00 },
-    { id: "F", name: "Menu F", desc: "3 Nems poulet ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷或3个饺子或2个虾卷 + 面或饭", price: 6.00 },
+    { id: "F", name: "Menu F", desc: "3 Nems Poulet ou 3 Nems Légumes ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷 或 3个蔬菜春卷 或3个饺子或2个虾卷 + 面或饭", price: 6.00 },
   ],
   plats: [
     { id: "loclac", name: "Loc Lac", desc: "Œuf +1€", descZh: "越式铁板牛肉饭（加蛋+1€）", price: 12.00, emoji: "🔥" },
     { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
-    { id: "soupe", name: "Soupe de Raviolis", descZh: "虾饺汤面", price: 10.00, emoji: "🥟" },
+    { id: "soupe", name: "Soupe de Raviolis (piquant ou non piquant)", descZh: "抄手汤 (辣 或 不辣)", price: 10.00, emoji: "🥟" },
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
