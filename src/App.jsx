@@ -12,8 +12,12 @@ const ICE_CHOICES = [
   { value: "no_ice", fr: "Sans glaçons", zh: "不加冰" },
 ];
 
-const SPICE_OPT = { key: "spice", fr: "Piquant", zh: "辣度", required: true, choices: SPICE_CHOICES };
-const ICE_OPT   = { key: "ice", fr: "Glaçons", zh: "冰度", required: true, choices: ICE_CHOICES };
+const SPICE_OPT   = { key: "spice", fr: "Piquant", zh: "辣度", required: true, choices: SPICE_CHOICES };
+const ICE_OPT     = { key: "ice", fr: "Glaçons", zh: "冰度", required: true, choices: ICE_CHOICES };
+const PIQUANT_OPT = { key: "piquant", fr: "Niveau de piquant", zh: "辣度", required: true, choices: [
+  { value: "piquant",     fr: "Piquant",     zh: "辣"  },
+  { value: "non_piquant", fr: "Non piquant", zh: "不辣" },
+] };
 
 const MENU = {
   menus: [
@@ -26,7 +30,7 @@ const MENU = {
   plats: [
     { id: "loclac", name: "Loc Lac", desc: "Œuf +1€", descZh: "越式铁板牛肉饭（加蛋+1€）", price: 12.00, emoji: "🔥" },
     { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
-    { id: "soupe", name: "Soupe de Raviolis (piquant ou non piquant)", descZh: "抄手汤 (辣 或 不辣)", price: 10.00, emoji: "🥟" },
+    { id: "soupe", name: "Soupe de Raviolis (piquant ou non piquant)", descZh: "抄手汤 (辣 或 不辣)", price: 10.00, emoji: "🥟", options: [PIQUANT_OPT] },
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
@@ -147,9 +151,10 @@ const MENU_OPTIONS = {
   F: {
     steps: [
       { key: "main", fr: "Plat principal", zh: "主菜", opts: [
-        ["3 Nems poulet", "3个鸡肉春卷"],
-        ["3 Raviolis", "3个饺子"],
-        ["2 Papillotes de crevettes", "2个虾饺"],
+        ["3 Nems Poulet",            "3个鸡肉春卷"],
+        ["3 Nems Légumes",           "3个蔬菜春卷"],
+        ["3 Raviolis",               "3个饺子"],
+        ["2 Papillotes de crevettes","2个虾饺"],
       ]},
       { key: "base", fr: "Base", zh: "主食", opts: [
         ["Nouilles", "面条"],
@@ -332,7 +337,7 @@ function openTicket(order) {
     lines += `  ${namePart.padEnd(20)}${subtotal.padStart(8)}€\n`;
     if (item.options) {
       for (const v of Object.values(item.options)) {
-        lines += `    ${v}\n`;
+        if (v && v.fr) lines += `    ${v.fr}\n`;
       }
     }
   }
@@ -378,7 +383,7 @@ function openFacture(order) {
     lines += `${namePart.padEnd(22)} ${String(item.qty).padStart(3)}  ${subtotal.padStart(8)}€\n`;
     if (item.options) {
       for (const v of Object.values(item.options)) {
-        lines += `  ${v}\n`;
+        if (v && v.fr) lines += `  ${v.fr}\n`;
       }
     }
   }
@@ -614,9 +619,9 @@ function CommandesTab() {
                   <div>
                     <span style={{ fontWeight: 600 }}>{item.name}</span>
                     <span style={{ color: "#999", marginLeft: 4 }}>×{item.qty}</span>
-                    {item.options && (
-                      <span style={{ color: "#888", fontSize: 12, marginLeft: 4 }}>
-                        — {Object.values(item.options).join(", ")}
+                    {item.options && Object.keys(item.options).length > 0 && (
+                      <span style={{ color: "#d97706", fontSize: 12, marginLeft: 4, fontWeight: 600 }}>
+                        ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
                       </span>
                     )}
                   </div>
@@ -1158,9 +1163,9 @@ function WorkStationPanel() {
                       <div style={{ fontSize: 28, fontWeight: 700 }}>
                         {item.name} <span style={{ color: "#f97316" }}>×{item.qty}</span>
                       </div>
-                      {item.options && (
-                        <div style={{ fontSize: 18, color: "#94a3b8", marginTop: 4 }}>
-                          {Object.values(item.options).filter(Boolean).join(" · ")}
+                      {item.options && Object.keys(item.options).length > 0 && (
+                        <div style={{ fontSize: 18, color: "#fbbf24", fontWeight: 700, marginTop: 4 }}>
+                          ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
                         </div>
                       )}
                     </div>
@@ -1899,7 +1904,10 @@ function OrderPage() {
           ))}
         </Section>
         <Section title={T.sections.plats}>
-          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
+          {MENU.plats.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />
+          )}
         </Section>
         <Section title={T.sections.banhMi}>
           {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang}
@@ -2057,7 +2065,7 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
 <div class="divider"></div>
 ${items.map(item => `
 <div class="item"><span class="item-name">${item.name}</span><span class="item-qty">×${item.qty}</span></div>
-${item.options ? `<div class="opt">${Object.values(item.options).filter(Boolean).join(" · ")}</div>` : ""}
+${item.options ? `<div class="opt">${Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}</div>` : ""}
 `).join("")}
 <div class="divider"></div>
 <div class="center" style="font-size:12px;">${payLabel}</div>
@@ -2408,9 +2416,9 @@ function KitchenPanel() {
                 {items.map((item, i) => (
                   <div key={i}>
                     {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 600 }}>×{item.qty}</span>
-                    {item.options && (
-                      <div style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888", fontSize: "14px" }}>
-                        {Object.values(item.options).filter(Boolean).join(" · ")}
+                    {item.options && Object.keys(item.options).length > 0 && (
+                      <div style={{ color: "#fbbf24", fontSize: "16px", fontWeight: 700, marginTop: 2 }}>
+                        ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
                       </div>
                     )}
                   </div>
