@@ -1,0 +1,33 @@
+{
+  "name": "雪红管理 Neige Admin",
+  "short_name": "雪红管理",
+  "description": "雪红餐厅管理后台",
+  "start_url": "/neige-rouge/admin.html",
+  "scope": "/neige-rouge/admin.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#FACC15",
+  "categories": ["food", "restaurant"],
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/neige-rouge/icons-admin/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/neige-rouge/icons-admin/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/neige-rouge/icons-admin/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

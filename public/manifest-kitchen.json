@@ -1,0 +1,33 @@
+{
+  "name": "雪红后厨 Neige Cuisine",
+  "short_name": "雪红后厨",
+  "description": "雪红餐厅后厨大屏",
+  "start_url": "/neige-rouge/kitchen.html",
+  "scope": "/neige-rouge/kitchen.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#1F2937",
+  "theme_color": "#1E40AF",
+  "categories": ["food", "restaurant"],
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/neige-rouge/icons-kitchen/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/neige-rouge/icons-kitchen/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/neige-rouge/icons-kitchen/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
