@@ -2298,7 +2298,7 @@ function KitchenPanel() {
 
   if (!authed) {
     return (
-      <div style={{ minHeight: "100vh", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ minHeight: "100vh", width: "100vw", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
         <div style={{ background: "#2a2a2a", borderRadius: 16, padding: 32, width: 320, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>👨‍🍳</div>
@@ -2328,7 +2328,7 @@ function KitchenPanel() {
   const totalUnpaid = orders.filter(o => o.payment_status === "pending_counter").reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
-    <div style={{ height: "100vh", overflow: "hidden", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", width: "100vw", overflow: "hidden", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white", display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
       <style>{`
         @keyframes flashBg { 0%, 100% { background: #ef4444; } 50% { background: #991b1b; } }
@@ -2338,21 +2338,21 @@ function KitchenPanel() {
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: "5px 12px", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14 }}>👨‍🍳</span>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>Cuisine · 后厨</span>
-          <span style={{ background: "#d4a017", color: "#1a1a1a", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 24 }}>👨‍🍳</span>
+          <span style={{ fontSize: 20, fontWeight: 600 }}>Cuisine · 后厨</span>
+          <span style={{ background: "#d4a017", color: "#1a1a1a", fontSize: 16, fontWeight: 700, padding: "4px 14px", borderRadius: 12 }}>
             {orders.length} EN COURS
           </span>
         </div>
-        <span style={{ fontSize: 11, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
+        <span style={{ fontSize: 22, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
       </div>
 
-      {/* responsive grid: 2 cols on mobile (~390px), 4+ cols on larger screens */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "5px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "5px", alignContent: "start" }}>
+      {/* responsive grid: 1 col mobile, 2 cols tablet portrait, 3-4 cols tablet landscape */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px", alignContent: "start" }}>
         {allDisplayOrders.length === 0 && (
-          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px 0", color: "#555", fontSize: 16 }}>
+          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px 0", color: "#555", fontSize: 22 }}>
             Aucune commande · 暂无订单
           </div>
         )}
@@ -2381,35 +2381,35 @@ function KitchenPanel() {
 
           return (
             <div key={order.id} className={isReady ? "flash-red" : isNew ? "new-order-pulse" : ""} style={{
-              padding: "6px",
-              borderRadius: "5px",
-              borderLeft: `3px solid ${borderColor}`,
+              padding: "14px",
+              borderRadius: "8px",
+              borderLeft: `5px solid ${borderColor}`,
               background: isReady ? undefined : "#2d2d2d",
               color: "white",
               position: "relative",
             }}>
               {isNew && !isReady && (
                 <span style={{
-                  position: "absolute", top: -6, right: -6,
+                  position: "absolute", top: -10, right: -10,
                   background: "#d4a017", color: "#1a1a1a",
-                  padding: "2px 6px", borderRadius: 10,
-                  fontSize: "9px", fontWeight: 700, zIndex: 10,
+                  padding: "3px 10px", borderRadius: 12,
+                  fontSize: "13px", fontWeight: 700, zIndex: 10,
                 }}>NEW</span>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "2px", marginBottom: "3px" }}>
-                <span style={{ fontSize: "18px", fontWeight: 500, color: isReady ? "white" : "#d4a017", flexShrink: 0 }}>{order.order_number}</span>
-                <span style={{ fontSize: "13px", fontWeight: 500, color: priceColor, flexShrink: 0 }}>{(order.total_amount || 0).toFixed(2)} €</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "30px", fontWeight: 700, color: isReady ? "white" : "#d4a017", flexShrink: 0 }}>{order.order_number}</span>
+                <span style={{ fontSize: "22px", fontWeight: 600, color: priceColor, flexShrink: 0 }}>{(order.total_amount || 0).toFixed(2)} €</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", marginBottom: "3px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", marginBottom: "6px" }}>
                 <span style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888" }}>{elapsedStr}</span>
-                <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel}</span>
+                <span style={{ color: statusColor, fontWeight: 600 }}>{statusLabel}</span>
               </div>
-              <div style={{ fontSize: "11px", lineHeight: 1.35, marginBottom: "4px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "3px", minHeight: "38px" }}>
+              <div style={{ fontSize: "16px", lineHeight: 1.4, marginBottom: "10px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "6px", minHeight: "56px" }}>
                 {items.map((item, i) => (
                   <div key={i}>
-                    {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 500 }}>×{item.qty}</span>
+                    {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 600 }}>×{item.qty}</span>
                     {item.options && (
-                      <div style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888", fontSize: "10px" }}>
+                      <div style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888", fontSize: "14px" }}>
                         {Object.values(item.options).filter(Boolean).join(" · ")}
                       </div>
                     )}
@@ -2417,8 +2417,8 @@ function KitchenPanel() {
                 ))}
               </div>
               <button onClick={handleAction} style={{
-                width: "100%", padding: "5px 0", border: "none", borderRadius: "4px",
-                fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                width: "100%", padding: "12px 0", border: "none", borderRadius: "6px",
+                fontSize: "17px", fontWeight: 700, cursor: "pointer",
                 background: btnBg, color: btnColor,
               }}>{btnLabel}</button>
             </div>
@@ -2427,14 +2427,14 @@ function KitchenPanel() {
       </div>
 
       {/* Bottom stats */}
-      <div style={{ padding: "4px 12px 6px", borderTop: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", flexShrink: 0 }}>
-        <div style={{ fontSize: "9px", color: "#888" }}>
-          🟠 À encaisser <span style={{ color: "#f59e0b", fontWeight: 600 }}>{countUnpaid}</span>
-          {" · "}🟢 En cours <span style={{ color: "#22c55e", fontWeight: 600 }}>{countInProgress}</span>
-          {" · "}🔴 Prêt <span style={{ color: "#ef4444", fontWeight: 600 }}>{countReady}</span>
+      <div style={{ padding: "8px 16px 10px", borderTop: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", flexShrink: 0 }}>
+        <div style={{ fontSize: "15px", color: "#888" }}>
+          🟠 À encaisser <span style={{ color: "#f59e0b", fontWeight: 700 }}>{countUnpaid}</span>
+          {" · "}🟢 En cours <span style={{ color: "#22c55e", fontWeight: 700 }}>{countInProgress}</span>
+          {" · "}🔴 Prêt <span style={{ color: "#ef4444", fontWeight: 700 }}>{countReady}</span>
         </div>
-        <div style={{ fontSize: "9px", color: "#888" }}>
-          Total non encaissé: <span style={{ color: "#f59e0b", fontWeight: 600 }}>{totalUnpaid.toFixed(2)} €</span>
+        <div style={{ fontSize: "15px", color: "#888" }}>
+          Total non encaissé: <span style={{ color: "#f59e0b", fontWeight: 700 }}>{totalUnpaid.toFixed(2)} €</span>
         </div>
       </div>
     </div>
