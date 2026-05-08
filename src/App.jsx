@@ -2328,7 +2328,7 @@ function KitchenPanel() {
   const totalUnpaid = orders.filter(o => o.payment_status === "pending_counter").reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
-    <div style={{ height: "100vh", width: "100vw", overflow: "hidden", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "#1a1a1a", fontFamily: "'Inter', sans-serif", color: "white", display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
       <style>{`
         @keyframes flashBg { 0%, 100% { background: #ef4444; } 50% { background: #991b1b; } }
@@ -2350,7 +2350,7 @@ function KitchenPanel() {
       </div>
 
       {/* responsive grid: 1 col mobile, 2 cols tablet portrait, 3-4 cols tablet landscape */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px", alignContent: "start" }}>
+      <div style={{ flex: 1, width: "100%", overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px", alignContent: "start" }}>
         {allDisplayOrders.length === 0 && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px 0", color: "#555", fontSize: 22 }}>
             Aucune commande · 暂无订单
