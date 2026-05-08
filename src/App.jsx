@@ -2349,8 +2349,8 @@ function KitchenPanel() {
         <span style={{ fontSize: 11, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
       </div>
 
-      {/* 4-column grid */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "5px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "5px", alignContent: "start" }}>
+      {/* responsive grid: 2 cols on mobile (~390px), 4+ cols on larger screens */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "5px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "5px", alignContent: "start" }}>
         {allDisplayOrders.length === 0 && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px 0", color: "#555", fontSize: 16 }}>
             Aucune commande · 暂无订单
@@ -2396,9 +2396,9 @@ function KitchenPanel() {
                   fontSize: "9px", fontWeight: 700, zIndex: 10,
                 }}>NEW</span>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "3px" }}>
-                <span style={{ fontSize: "18px", fontWeight: 500, color: isReady ? "white" : "#d4a017" }}>{order.order_number}</span>
-                <span style={{ fontSize: "13px", fontWeight: 500, color: priceColor }}>{(order.total_amount || 0).toFixed(2)} €</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "2px", marginBottom: "3px" }}>
+                <span style={{ fontSize: "18px", fontWeight: 500, color: isReady ? "white" : "#d4a017", flexShrink: 0 }}>{order.order_number}</span>
+                <span style={{ fontSize: "13px", fontWeight: 500, color: priceColor, flexShrink: 0 }}>{(order.total_amount || 0).toFixed(2)} €</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", marginBottom: "3px" }}>
                 <span style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888" }}>{elapsedStr}</span>
@@ -2427,7 +2427,7 @@ function KitchenPanel() {
       </div>
 
       {/* Bottom stats */}
-      <div style={{ padding: "4px 12px 6px", borderTop: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+      <div style={{ padding: "4px 12px 6px", borderTop: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", flexShrink: 0 }}>
         <div style={{ fontSize: "9px", color: "#888" }}>
           🟠 À encaisser <span style={{ color: "#f59e0b", fontWeight: 600 }}>{countUnpaid}</span>
           {" · "}🟢 En cours <span style={{ color: "#22c55e", fontWeight: 600 }}>{countInProgress}</span>
@@ -3507,3 +3507,5 @@ export default function App() {
     </>
   );
 }
+
+export { KitchenPanel, AdminPanel };
