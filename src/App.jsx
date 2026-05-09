@@ -337,7 +337,8 @@ function openTicket(order) {
     lines += `  ${namePart.padEnd(20)}${subtotal.padStart(8)}€\n`;
     if (item.options) {
       for (const v of Object.values(item.options)) {
-        if (v && v.fr) lines += `    ${v.fr}\n`;
+        const vStr = typeof v === "string" ? v : v?.fr;
+        if (vStr) lines += `    ${vStr}\n`;
       }
     }
   }
@@ -383,7 +384,8 @@ function openFacture(order) {
     lines += `${namePart.padEnd(22)} ${String(item.qty).padStart(3)}  ${subtotal.padStart(8)}€\n`;
     if (item.options) {
       for (const v of Object.values(item.options)) {
-        if (v && v.fr) lines += `  ${v.fr}\n`;
+        const vStr = typeof v === "string" ? v : v?.fr;
+        if (vStr) lines += `  ${vStr}\n`;
       }
     }
   }
@@ -621,7 +623,7 @@ function CommandesTab() {
                     <span style={{ color: "#999", marginLeft: 4 }}>×{item.qty}</span>
                     {item.options && Object.keys(item.options).length > 0 && (
                       <span style={{ color: "#d97706", fontSize: 12, marginLeft: 4, fontWeight: 600 }}>
-                        ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
+                        ⭐ {Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </div>
@@ -1165,7 +1167,7 @@ function WorkStationPanel() {
                       </div>
                       {item.options && Object.keys(item.options).length > 0 && (
                         <div style={{ fontSize: 18, color: "#fbbf24", fontWeight: 700, marginTop: 4 }}>
-                          ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
+                          ⭐ {Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}
                         </div>
                       )}
                     </div>
@@ -2065,7 +2067,7 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
 <div class="divider"></div>
 ${items.map(item => `
 <div class="item"><span class="item-name">${item.name}</span><span class="item-qty">×${item.qty}</span></div>
-${item.options ? `<div class="opt">${Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}</div>` : ""}
+${item.options ? `<div class="opt">${Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}</div>` : ""}
 `).join("")}
 <div class="divider"></div>
 <div class="center" style="font-size:12px;">${payLabel}</div>
@@ -2418,7 +2420,7 @@ function KitchenPanel() {
                     {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 600 }}>×{item.qty}</span>
                     {item.options && Object.keys(item.options).length > 0 && (
                       <div style={{ color: "#fbbf24", fontSize: "16px", fontWeight: 700, marginTop: 2 }}>
-                        ⭐ {Object.values(item.options).filter(v => v && v.fr).map(v => v.fr).join(" · ")}
+                        ⭐ {Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}
                       </div>
                     )}
                   </div>
