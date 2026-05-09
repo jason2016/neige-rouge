@@ -150,11 +150,11 @@ function ModalTitle({ emoji, zh, sub, fr }) {
   return (
     <div style={{ textAlign: 'center', marginBottom: 26 }}>
       <div style={{ fontSize: 36, marginBottom: 8 }}>{emoji}</div>
-      <div style={{ color: '#f5f0e8', fontSize: 23, fontWeight: 900, lineHeight: 1.3 }}>{zh}</div>
+      <div style={{ color: '#f5f0e8', fontSize: 23, fontWeight: 900, lineHeight: 1.3 }}>{fr}</div>
       {sub && (
         <div style={{ color: '#8B0000', fontSize: 16, fontWeight: 700, marginTop: 5 }}>{sub}</div>
       )}
-      <div style={{ color: '#a09882', fontSize: 13, marginTop: 5 }}>{fr}</div>
+      <div style={{ color: '#a09882', fontSize: 13, marginTop: 5 }}>{zh}</div>
     </div>
   );
 }
@@ -173,8 +173,8 @@ function Step({ num, zh, fr }) {
         fontSize: 22, fontWeight: 900, flexShrink: 0,
       }}>{num}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ color: '#f5f0e8', fontWeight: 700, fontSize: 19, lineHeight: 1.35 }}>{zh}</div>
-        <div style={{ color: '#a09882', fontSize: 14, marginTop: 5, lineHeight: 1.4 }}>{fr}</div>
+        <div style={{ color: '#f5f0e8', fontWeight: 700, fontSize: 19, lineHeight: 1.35 }}>{fr}</div>
+        <div style={{ color: '#a09882', fontSize: 14, marginTop: 5, lineHeight: 1.4 }}>{zh}</div>
       </div>
     </div>
   );
@@ -192,7 +192,7 @@ function OkButton({ onClose }) {
         marginTop: 6,
       }}
     >
-      我知道了 · D'accord
+      D'accord · 知道了
     </button>
   );
 }
@@ -204,31 +204,31 @@ function IOSGuide({ onClose }) {
     <div>
       <ModalTitle
         emoji="📲"
+        fr="Ajouter à l'écran d'accueil"
+        sub="Une fois pour toutes"
         zh="添加到桌面"
-        sub="一次设置，永久使用"
-        fr="Ajouter à l'écran · Une fois pour toutes"
       />
 
       <Step
         num="1"
-        zh="点击底部 📤 分享按钮"
-        fr='Cliquez sur le bouton 📤 "Partager" en bas'
+        fr="Cliquez sur 📤 en bas"
+        zh="点击底部分享按钮"
       />
 
       <div style={{ textAlign: 'center', fontSize: 20, color: '#8B0000', marginBottom: 14, letterSpacing: 4 }}>
-        ↓ &nbsp; 底部 / En bas &nbsp; ↓
+        ↓ &nbsp; En bas / 底部 &nbsp; ↓
       </div>
 
       <Step
         num="2"
-        zh='选择"添加到主屏幕" 🏠'
-        fr={`"Sur l'écran d'accueil"`}
+        fr={`Sur l'écran d'accueil 🏠`}
+        zh="选择添加到主屏幕"
       />
 
       <Step
         num="3"
-        zh='点击右上角"添加" ✅'
-        fr='Cliquez sur "Ajouter" en haut à droite'
+        fr='Cliquez sur "Ajouter" ✅'
+        zh="点击添加"
       />
 
       <OkButton onClose={onClose} />
@@ -243,27 +243,27 @@ function AndroidDesktopGuide({ onClose }) {
     <div>
       <ModalTitle
         emoji="📲"
-        zh="添加到桌面"
-        sub="一次设置，永久使用"
         fr="Ajouter à l'écran d'accueil"
+        sub="Une fois pour toutes"
+        zh="添加到桌面"
       />
 
       <Step
         num="1"
-        zh="点浏览器右上角菜单 ⋮"
-        fr="Appuyez sur le menu ⋮ en haut à droite"
+        fr="Menu ⋮ en haut à droite"
+        zh="点右上角菜单"
       />
 
       <Step
         num="2"
-        zh='选择"添加到主屏幕" 🏠'
-        fr={`"Ajouter à l'écran d'accueil"`}
+        fr={`"Ajouter à l'écran d'accueil" 🏠`}
+        zh="选择添加到主屏幕"
       />
 
       <Step
         num="3"
-        zh='点击"添加"确认 ✅'
-        fr='Confirmez en cliquant "Ajouter"'
+        fr='Confirmez "Ajouter" ✅'
+        zh="点击添加确认"
       />
 
       <OkButton onClose={onClose} />
