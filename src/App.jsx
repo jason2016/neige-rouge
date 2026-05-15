@@ -2459,13 +2459,22 @@ function KitchenPanel() {
                 <span style={{ color: isReady ? "rgba(255,255,255,0.6)" : "#888" }}>{elapsedStr}</span>
                 <span style={{ color: statusColor, fontWeight: 600 }}>{statusLabel}</span>
               </div>
-              <div style={{ fontSize: "16px", lineHeight: 1.4, marginBottom: "10px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "6px", minHeight: "56px" }}>
+              <div style={{ lineHeight: 1.3, marginBottom: "10px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "8px" }}>
                 {items.map((item, i) => (
-                  <div key={i}>
-                    {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 600 }}>×{item.qty}</span>
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: "26px", fontWeight: 800 }}>
+                      {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 700 }}>×{item.qty}</span>
+                    </div>
                     {item.options && Object.keys(item.options).length > 0 && (
-                      <div style={{ color: "#fbbf24", fontSize: "16px", fontWeight: 700, marginTop: 2 }}>
-                        ⭐ {Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}
+                      <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                        {Object.values(item.options)
+                          .map(v => typeof v === "string" ? v : v?.fr)
+                          .filter(Boolean)
+                          .map((opt, oi) => (
+                            <div key={oi} style={{ color: "#fbbf24", fontSize: "22px", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                              <span>⭐</span><span>{opt}</span>
+                            </div>
+                          ))}
                       </div>
                     )}
                   </div>
