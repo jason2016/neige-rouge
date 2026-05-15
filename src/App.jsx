@@ -18,6 +18,10 @@ const PIQUANT_OPT = { key: "piquant", fr: "Niveau de piquant", zh: "辣度", req
   { value: "piquant",     fr: "Piquant",     zh: "辣"  },
   { value: "non_piquant", fr: "Non piquant", zh: "不辣" },
 ] };
+const EGG_OPT = { key: "egg", fr: "Œuf", zh: "加蛋选项", required: true, choices: [
+  { value: "avec_egg", fr: "Avec œuf (+1€)", zh: "加蛋 (+1€)", price: 1.00 },
+  { value: "sans_egg", fr: "Sans œuf",       zh: "不加蛋",      price: 0    },
+] };
 
 const MENU = {
   menus: [
@@ -28,7 +32,7 @@ const MENU = {
     { id: "F", name: "Menu F", desc: "3 Nems Poulet ou 3 Nems Légumes ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷 或 3个蔬菜春卷 或3个饺子或2个虾卷 + 面或饭", price: 6.00 },
   ],
   plats: [
-    { id: "loclac", name: "Loc Lac", desc: "Œuf +1€", descZh: "越式铁板牛肉饭（加蛋+1€）", price: 12.00, emoji: "🔥" },
+    { id: "loclac", name: "Loc Lac", descZh: "越式铁板牛肉饭", price: 12.00, emoji: "🔥", options: [EGG_OPT] },
     { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
     { id: "soupe", name: "Soupe de Raviolis (piquant ou non piquant)", descZh: "抄手汤 (辣 或 不辣)", price: 10.00, emoji: "🥟", options: [PIQUANT_OPT] },
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
@@ -1627,7 +1631,8 @@ function MenuCustomizer({ item, lang, onConfirm, onClose }) {
 function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
   const [selections, setSelections] = useState({});
   const allSelected = item.options.every(opt => !opt.required || selections[opt.key]);
-  const pick = (key, choice) => setSelections(prev => ({ ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value } }));
+  const pick = (key, choice) => setSelections(prev => ({ ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value, price: choice.price || 0 } }));
+  const priceAdj = Object.values(selections).reduce((s, v) => s + (v.price || 0), 0);
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1636,7 +1641,7 @@ function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{item.name}</div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginTop: 2 }}>{item.price.toFixed(2)}€</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", color: "#8B0000", fontWeight: 700, marginTop: 2 }}>{(item.price + priceAdj).toFixed(2)}€</div>
           </div>
           <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 20, cursor: "pointer", flexShrink: 0 }}>×</button>
         </div>
@@ -1817,10 +1822,11 @@ function OrderPage() {
     ...MENU.menus.find(m => m.id === sel.menuId),
     qty: 1, options: sel.options, uid: sel.uid,
   }));
-  const optionCartItems = optionSelections.map(sel => ({
-    ...flatItems.find(i => i.id === sel.itemId),
-    qty: 1, options: sel.selections, uid: sel.uid,
-  }));
+  const optionCartItems = optionSelections.map(sel => {
+    const base = flatItems.find(i => i.id === sel.itemId);
+    const priceAdj = Object.values(sel.selections).reduce((s, v) => s + (v.price || 0), 0);
+    return { ...base, qty: 1, options: sel.selections, uid: sel.uid, price: (base?.price || 0) + priceAdj };
+  });
   const allCartItems = [...bentoCartItems, ...nonBentoCartItems, ...optionCartItems];
   const total = allCartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = allCartItems.reduce((s, i) => s + i.qty, 0);
