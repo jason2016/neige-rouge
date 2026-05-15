@@ -33,6 +33,19 @@ const MOCHI_FLAVOR_OPT = { key: "flavor", fr: "Parfum", zh: "口味", required: 
   { value: "vanille",  fr: "Vanille",      zh: "香草",  price: 0 },
   { value: "chocolat", fr: "Chocolat",     zh: "巧克力", price: 0 },
 ] };
+const BANH_MI_SPICE_OPT     = { key: "spice",     fr: "Piquant",     zh: "辣度", required: true, choices: [
+  { value: "piquant",     fr: "Piquant",     zh: "辣",  price: 0 },
+  { value: "non_piquant", fr: "Non piquant", zh: "不辣", price: 0 },
+] };
+const BANH_MI_CORIANDRE_OPT = { key: "coriandre", fr: "Coriandre",   zh: "香菜",  required: true, choices: [
+  { value: "avec", fr: "Avec coriandre", zh: "加香菜",  price: 0 },
+  { value: "sans", fr: "Sans coriandre", zh: "不加香菜", price: 0 },
+] };
+const BANH_MI_MAYO_OPT      = { key: "mayo",      fr: "Mayonnaise",  zh: "蛋黄酱", required: true, choices: [
+  { value: "avec", fr: "Avec mayonnaise", zh: "加蛋黄酱",  price: 0 },
+  { value: "sans", fr: "Sans mayonnaise", zh: "不加蛋黄酱", price: 0 },
+] };
+const BM_OPTS = [BANH_MI_SPICE_OPT, BANH_MI_CORIANDRE_OPT, BANH_MI_MAYO_OPT];
 
 const MENU = {
   menus: [
@@ -49,12 +62,12 @@ const MENU = {
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
-    { id: "bm-poulet", name: "Banh Mi Poulet", descZh: "鸡肉越南法棍", price: 6.00, options: [SPICE_OPT] },
-    { id: "bm-boeuf", name: "Banh Mi Boeuf", descZh: "牛肉越南法棍", price: 6.00, options: [SPICE_OPT] },
-    { id: "bm-veg", name: "Banh Mi Végétarien", descZh: "素越南法棍", price: 6.00, options: [SPICE_OPT] },
-    { id: "bm-special", name: "Banh Mi Poulet Croustillant ou Porc Caramel", descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40, options: [SPICE_OPT] },
-    { id: "bm-bt", name: "Banh Mi + Bubble Tea", descZh: "越南法棍 + 奶茶", price: 10.00, options: [SPICE_OPT, ICE_OPT] },
-    { id: "bm-special-bt", name: "Banh Mi Poulet Croustillant ou Porc Caramel + Bubble Tea", descZh: "脆皮鸡/焦糖猪肉法棍 + 奶茶", price: 10.40, options: [SPICE_OPT, ICE_OPT] },
+    { id: "bm-poulet",     name: "Banh Mi Poulet",                                          descZh: "鸡肉越南法棍",         price: 6.00,  options: BM_OPTS },
+    { id: "bm-boeuf",      name: "Banh Mi Boeuf",                                           descZh: "牛肉越南法棍",         price: 6.00,  options: BM_OPTS },
+    { id: "bm-veg",        name: "Banh Mi Végétarien",                                      descZh: "素越南法棍",           price: 6.00,  options: BM_OPTS },
+    { id: "bm-special",    name: "Banh Mi Poulet Croustillant ou Porc Caramel",             descZh: "脆皮鸡/焦糖猪肉越南法棍", price: 6.40,  options: BM_OPTS },
+    { id: "bm-bt",         name: "Banh Mi + Bubble Tea",                                    descZh: "越南法棍 + 奶茶",       price: 10.00, options: [...BM_OPTS, ICE_OPT] },
+    { id: "bm-special-bt", name: "Banh Mi Poulet Croustillant ou Porc Caramel + Bubble Tea", descZh: "脆皮鸡/焦糖猪肉法棍 + 奶茶", price: 10.40, options: [...BM_OPTS, ICE_OPT] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
