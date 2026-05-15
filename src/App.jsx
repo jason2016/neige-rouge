@@ -87,6 +87,7 @@ const MENU = {
   ],
   boissons: [
     { id: "coca", name: "Coca Cola 33cl", descZh: "可口可乐 33cl", price: 1.70 },
+    { id: "coca-zero", name: "Coca Zero 33cl", descZh: "可口可乐零度 33cl", price: 1.70 },
     { id: "orangina", name: "Orangina 33cl", descZh: "橙味汽水 33cl", price: 1.70 },
     { id: "oasis", name: "Oasis 33cl", descZh: "绿洲果汁 33cl", price: 1.70 },
     { id: "perrier", name: "Perrier 33cl", descZh: "巴黎水 33cl", price: 1.70 },
@@ -95,6 +96,7 @@ const MENU = {
     { id: "coco-jus", name: "Jus de Coco 25cl", descZh: "椰子汁 25cl", price: 2.00 },
     { id: "litchi", name: "Jus de Litchi 25cl", descZh: "荔枝汁 25cl", price: 2.00 },
     { id: "biere", name: "Bière 33cl", descZh: "啤酒 33cl", price: 3.00, vat_rate: 0.20 },
+    { id: "eau", name: "Eau Minérale 50cl", descZh: "矿泉水 50cl", price: 1.70 },
   ],
   milkTea: [
     { id: "mt-coco", name: "Thé au lait Coco", descZh: "椰子奶茶", price: 5.00, options: [ICE_OPT] },
