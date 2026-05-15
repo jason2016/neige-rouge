@@ -22,6 +22,13 @@ const EGG_OPT = { key: "egg", fr: "Œuf", zh: "加蛋选项", required: true, ch
   { value: "avec_egg", fr: "Avec œuf (+1€)", zh: "加蛋 (+1€)", price: 1.00 },
   { value: "sans_egg", fr: "Sans œuf",       zh: "不加蛋",      price: 0    },
 ] };
+const MOCHI_FLAVOR_OPT = { key: "flavor", fr: "Parfum", zh: "口味", required: true, choices: [
+  { value: "mangue",   fr: "Mangue",       zh: "芒果",  price: 0 },
+  { value: "the_vert", fr: "Thé Vert",     zh: "抹茶",  price: 0 },
+  { value: "coco",     fr: "Noix de Coco", zh: "椰子",  price: 0 },
+  { value: "vanille",  fr: "Vanille",      zh: "香草",  price: 0 },
+  { value: "chocolat", fr: "Chocolat",     zh: "巧克力", price: 0 },
+] };
 
 const MENU = {
   menus: [
@@ -59,7 +66,7 @@ const MENU = {
   desserts: [
     { id: "coco", name: "Boule de Coco", descZh: "椰子球", price: 1.50 },
     { id: "fond", name: "Fondant au Chocolat", descZh: "巧克力熔岩蛋糕", price: 3.00 },
-    { id: "mochi", name: "2 Mochis Glacé", descZh: "2个冰麻薯", price: 4.00 },
+    { id: "mochi", name: "1 Mochi Glacé", descZh: "冰麻薯", price: 2.00, options: [MOCHI_FLAVOR_OPT] },
   ],
   boissons: [
     { id: "coca", name: "Coca Cola 33cl", descZh: "可口可乐 33cl", price: 1.70 },
@@ -1928,7 +1935,10 @@ function OrderPage() {
           {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.desserts}>
-          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
+          {MENU.desserts.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />
+          )}
         </Section>
         <Section title={T.sections.boissons}>
           {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
