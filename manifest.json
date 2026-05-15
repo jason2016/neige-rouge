@@ -1,6 +1,6 @@
 {
-  "name": "Neige Rouge 红雪餐厅",
-  "short_name": "红雪",
+  "name": "Neige Rouge",
+  "short_name": "Neige Rouge",
   "description": "Cuisine Vietnamienne & Chinoise - Réservation en ligne",
   "start_url": "/neige-rouge/#order",
   "scope": "/neige-rouge/",
