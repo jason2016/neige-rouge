@@ -22,6 +22,10 @@ const EGG_OPT = { key: "egg", fr: "Œuf", zh: "加蛋选项", required: true, ch
   { value: "avec_egg", fr: "Avec œuf (+1€)", zh: "加蛋 (+1€)", price: 1.00 },
   { value: "sans_egg", fr: "Sans œuf",       zh: "不加蛋",      price: 0    },
 ] };
+const NEM_TYPE_OPT = { key: "type", fr: "Choix", zh: "选择", required: true, choices: [
+  { value: "poulet",  fr: "Poulet",  zh: "鸡肉", price: 0 },
+  { value: "legumes", fr: "Légumes", zh: "蔬菜", price: 0 },
+] };
 const MOCHI_FLAVOR_OPT = { key: "flavor", fr: "Parfum", zh: "口味", required: true, choices: [
   { value: "mangue",   fr: "Mangue",       zh: "芒果",  price: 0 },
   { value: "the_vert", fr: "Thé Vert",     zh: "抹茶",  price: 0 },
@@ -60,7 +64,7 @@ const MENU = {
   carte: [
     { id: "pap", name: "4 Papillotes de Crevettes", descZh: "4个虾卷", price: 6.50 },
     { id: "temp", name: "4 Tempura Crevette", descZh: "4个炸虾天妇罗", price: 6.50 },
-    { id: "nems", name: "2 Nems Poulet ou Légumes", descZh: "2个春卷（鸡肉或蔬菜）", price: 2.50 },
+    { id: "nems", name: "2 Nems Poulet ou Légumes", descZh: "2个春卷（鸡肉或蔬菜）", price: 2.50, options: [NEM_TYPE_OPT] },
     { id: "rav", name: "2 Raviolis Poulet", descZh: "2个鸡肉饺子", price: 2.50 },
   ],
   desserts: [
@@ -1932,7 +1936,10 @@ function OrderPage() {
           {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
         <Section title={T.sections.carte}>
-          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />)}
+          {MENU.carte.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} soldOut={stock[item.id]?.sold_out} />
+          )}
         </Section>
         <Section title={T.sections.desserts}>
           {MENU.desserts.map(item => item.options
