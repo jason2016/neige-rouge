@@ -87,7 +87,7 @@ const MENU = {
   ],
   boissons: [
     { id: "coca", name: "Coca Cola 33cl", descZh: "可口可乐 33cl", price: 1.70 },
-    { id: "coca-zero", name: "Coca Zero 33cl", descZh: "可口可乐零度 33cl", price: 1.70 },
+    { id: "coca-zero", name: "Coca Zéro 33cl", descZh: "可口可乐零度 33cl", price: 1.70 },
     { id: "orangina", name: "Orangina 33cl", descZh: "橙味汽水 33cl", price: 1.70 },
     { id: "oasis", name: "Oasis 33cl", descZh: "绿洲果汁 33cl", price: 1.70 },
     { id: "perrier", name: "Perrier 33cl", descZh: "巴黎水 33cl", price: 1.70 },
