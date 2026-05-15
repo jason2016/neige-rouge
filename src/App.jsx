@@ -1191,13 +1191,20 @@ function WorkStationPanel() {
                 )}
                 <div>
                   {items.map((item, i) => (
-                    <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #334155" }}>
-                      <div style={{ fontSize: 28, fontWeight: 700 }}>
+                    <div key={i} style={{ padding: "12px 0", borderBottom: "1px solid #334155" }}>
+                      <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.2 }}>
                         {item.name} <span style={{ color: "#f97316" }}>×{item.qty}</span>
                       </div>
                       {item.options && Object.keys(item.options).length > 0 && (
-                        <div style={{ fontSize: 18, color: "#fbbf24", fontWeight: 700, marginTop: 4 }}>
-                          ⭐ {Object.values(item.options).map(v => typeof v === "string" ? v : v?.fr).filter(Boolean).join(" · ")}
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                          {Object.values(item.options)
+                            .map(v => typeof v === "string" ? v : v?.fr)
+                            .filter(Boolean)
+                            .map((opt, oi) => (
+                              <div key={oi} style={{ fontSize: 26, color: "#fbbf24", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                                <span>⭐</span><span>{opt}</span>
+                              </div>
+                            ))}
                         </div>
                       )}
                     </div>
