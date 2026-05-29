@@ -80,6 +80,7 @@ const MENU = {
     { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea en option +4€", descZh: "素越南法棍 · 可加珍珠奶茶 +4€",     price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
     { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea en option +4€", descZh: "脆皮鸡越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
     { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea en option +4€", descZh: "焦糖猪肉越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea en option +4€", descZh: "蜜汁烧猪越南法棍 · 可加珍珠奶茶 +4€", price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
