@@ -46,6 +46,19 @@ const BANH_MI_MAYO_OPT      = { key: "mayo",      fr: "Mayonnaise",  zh: "蛋黄
   { value: "sans", fr: "Sans mayonnaise", zh: "不加蛋黄酱", price: 0 },
 ] };
 const BM_OPTS = [BANH_MI_SPICE_OPT, BANH_MI_CORIANDRE_OPT, BANH_MI_MAYO_OPT];
+// Optional Bubble Tea add-on (+4€). 3-way to preserve ice-level info from the old "+BT" items.
+// Price is summed automatically via the generic Σ v.price path (same as EGG_OPT).
+const BT_ADDON_OPT = {
+  key: "bubble_tea_addon",
+  fr: "Bubble Tea (optionnel)",
+  zh: "珍珠奶茶 (可选)",
+  required: true,
+  choices: [
+    { value: "no",        fr: "Non",                      zh: "不加",             price: 0 },
+    { value: "yes_ice",   fr: "Oui, avec glaçons (+4€)",  zh: "加, 要冰 (+4€)",   price: 4 },
+    { value: "yes_noice", fr: "Oui, sans glaçons (+4€)",  zh: "加, 不要冰 (+4€)", price: 4 },
+  ],
+};
 
 const MENU = {
   menus: [
@@ -62,14 +75,11 @@ const MENU = {
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
-    { id: "bm-poulet",     name: "Banh Mi Poulet",                                          descZh: "鸡肉越南法棍",         price: 6.00,  options: BM_OPTS },
-    { id: "bm-boeuf",      name: "Banh Mi Boeuf",                                           descZh: "牛肉越南法棍",         price: 6.00,  options: BM_OPTS },
-    { id: "bm-veg",        name: "Banh Mi Végétarien",                                      descZh: "素越南法棍",           price: 6.00,  options: BM_OPTS },
-    { id: "bm-poulet-croustillant",    name: "Banh Mi Poulet Croustillant",              descZh: "脆皮鸡越南法棍",      price: 6.40,  options: BM_OPTS },
-    { id: "bm-porc-caramel",           name: "Banh Mi Porc Caramel",                     descZh: "焦糖猪肉越南法棍",    price: 6.40,  options: BM_OPTS },
-    { id: "bm-bt",                     name: "Banh Mi + Bubble Tea",                     descZh: "越南法棍 + 奶茶",     price: 10.00, options: [...BM_OPTS, ICE_OPT] },
-    { id: "bm-poulet-croustillant-bt", name: "Banh Mi Poulet Croustillant + Bubble Tea", descZh: "脆皮鸡法棍 + 奶茶",   price: 10.40, options: [...BM_OPTS, ICE_OPT] },
-    { id: "bm-porc-caramel-bt",        name: "Banh Mi Porc Caramel + Bubble Tea",        descZh: "焦糖猪肉法棍 + 奶茶", price: 10.40, options: [...BM_OPTS, ICE_OPT] },
+    { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea en option +4€", descZh: "鸡肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea en option +4€", descZh: "牛肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea en option +4€", descZh: "素越南法棍 · 可加珍珠奶茶 +4€",     price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea en option +4€", descZh: "脆皮鸡越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea en option +4€", descZh: "焦糖猪肉越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
@@ -2514,17 +2524,28 @@ function KitchenPanel() {
                 <span style={{ color: statusColor, fontWeight: 600 }}>{statusLabel}</span>
               </div>
               <div style={{ lineHeight: 1.3, marginBottom: "10px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "8px" }}>
-                {items.map((item, i) => (
+                {items.map((item, i) => {
+                  // Bubble Tea add-on: show as a name suffix (not a ⭐ line). Value stored as the fr
+                  // label by the API payload; match on label or raw value to stay robust.
+                  const btRaw = item.options?.bubble_tea_addon;
+                  const btStr = typeof btRaw === "string" ? btRaw : (btRaw?.fr || btRaw?.value || "");
+                  let btSuffix = "";
+                  if (/avec gla|yes_ice/i.test(btStr)) btSuffix = " + Bubble Tea (avec glaçons)";
+                  else if (/sans gla|yes_noice/i.test(btStr)) btSuffix = " + Bubble Tea (sans glaçons)";
+                  const optLines = item.options
+                    ? Object.entries(item.options)
+                        .filter(([k]) => k !== "bubble_tea_addon")
+                        .map(([, v]) => typeof v === "string" ? v : v?.fr)
+                        .filter(Boolean)
+                    : [];
+                  return (
                   <div key={i} style={{ marginBottom: 8 }}>
                     <div style={{ fontSize: "26px", fontWeight: 800 }}>
-                      {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 700 }}>×{item.qty}</span>
+                      {item.name}{btSuffix} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 700 }}>×{item.qty}</span>
                     </div>
-                    {item.options && Object.keys(item.options).length > 0 && (
+                    {optLines.length > 0 && (
                       <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-                        {Object.values(item.options)
-                          .map(v => typeof v === "string" ? v : v?.fr)
-                          .filter(Boolean)
-                          .map((opt, oi) => (
+                        {optLines.map((opt, oi) => (
                             <div key={oi} style={{ color: "#fbbf24", fontSize: "22px", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                               <span>⭐</span><span>{opt}</span>
                             </div>
@@ -2532,7 +2553,8 @@ function KitchenPanel() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <button onClick={handleAction} style={{
                 width: "100%", padding: "12px 0", border: "none", borderRadius: "6px",
