@@ -1583,6 +1583,13 @@ function MenuCustomizer({ item, lang, onConfirm, onClose }) {
   const [step, setStep] = useState(0);
   const [selections, setSelections] = useState({});
   const allDone = steps.every(s => selections[s.key]);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    if (allDone && btnRef.current) {
+      btnRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [allDone]);
 
   const pick = (key, opt) => {
     const newSel = { ...selections, [key]: { fr: opt[0], zh: opt[1] } };
@@ -1651,11 +1658,31 @@ function MenuCustomizer({ item, lang, onConfirm, onClose }) {
           );
         })}
 
-        {allDone && (
-          <button onClick={() => onConfirm(selections)} style={{ width: "100%", padding: 18, borderRadius: 12, border: "none", background: "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)", color: "white", fontSize: 18, fontWeight: 700, cursor: "pointer" }}>
-            {lang === "zh" ? "加入购物车 +" : "Ajouter au panier +"}
+        <div style={{ position: "relative" }}>
+          <button ref={btnRef} onClick={() => allDone && onConfirm(selections)} disabled={!allDone} style={{
+            width: "100%", padding: 18, borderRadius: 12, border: "none",
+            background: allDone ? "#8B0000" : "#e5e5e5",
+            color: allDone ? "white" : "#999",
+            fontSize: 18, fontWeight: 700, cursor: allDone ? "pointer" : "default",
+            transition: "background 0.3s, color 0.3s",
+            animation: allDone ? "nr-breathe 1.5s ease-in-out infinite" : "none",
+          }}>
+            {allDone
+              ? (lang === "zh" ? "✓ 加入购物车" : "✓ Ajouter au panier")
+              : (lang === "zh" ? "请完成选择" : "Veuillez compléter votre choix")}
           </button>
-        )}
+          {allDone && (
+            /* pointer-events:none → never blocks clicks; right-side → never covers text */
+            <span aria-hidden="true" style={{
+              position: "absolute", right: 0, top: 0, bottom: 0, width: 56,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "none", userSelect: "none",
+            }}>
+              <span style={{ fontSize: 22, lineHeight: 1, display: "block",
+                animation: "nr-tap 3s ease-in-out infinite" }}>👇</span>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1666,6 +1693,14 @@ function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
   const allSelected = item.options.every(opt => !opt.required || selections[opt.key]);
   const pick = (key, choice) => setSelections(prev => ({ ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value, price: choice.price || 0 } }));
   const priceAdj = Object.values(selections).reduce((s, v) => s + (v.price || 0), 0);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    if (allSelected && btnRef.current) {
+      btnRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [allSelected]);
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1702,14 +1737,31 @@ function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
             </div>
           </div>
         ))}
-        <button onClick={() => allSelected && onConfirm(selections)} disabled={!allSelected} style={{
-          width: "100%", padding: 18, borderRadius: 12, border: "none",
-          background: allSelected ? "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)" : "#e5e5e5",
-          color: allSelected ? "white" : "#999",
-          fontSize: 18, fontWeight: 700, cursor: allSelected ? "pointer" : "default",
-        }}>
-          {lang === "zh" ? "加入购物车 +" : "Ajouter au panier +"}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button ref={btnRef} onClick={() => allSelected && onConfirm(selections)} disabled={!allSelected} style={{
+            width: "100%", padding: 18, borderRadius: 12, border: "none",
+            background: allSelected ? "#8B0000" : "#e5e5e5",
+            color: allSelected ? "white" : "#999",
+            fontSize: 18, fontWeight: 700, cursor: allSelected ? "pointer" : "default",
+            transition: "background 0.3s, color 0.3s",
+            animation: allSelected ? "nr-breathe 1.5s ease-in-out infinite" : "none",
+          }}>
+            {allSelected
+              ? (lang === "zh" ? "✓ 加入购物车" : "✓ Ajouter au panier")
+              : (lang === "zh" ? "请完成选择" : "Veuillez compléter votre choix")}
+          </button>
+          {allSelected && (
+            /* pointer-events:none → never blocks clicks; right-side → never covers text */
+            <span aria-hidden="true" style={{
+              position: "absolute", right: 0, top: 0, bottom: 0, width: 56,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "none", userSelect: "none",
+            }}>
+              <span style={{ fontSize: 22, lineHeight: 1, display: "block",
+                animation: "nr-tap 3s ease-in-out infinite" }}>👇</span>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2524,13 +2576,31 @@ function MenuPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [bookingCode, setBookingCode] = useState("");
+  const [optionSelections, setOptionSelections] = useState([]);
+  const [optionsItem, setOptionsItem] = useState(null);
 
   const T = t[lang];
-  const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons];
+  const flatItems = [...MENU.plats, ...MENU.banhMi, ...MENU.boBun, ...MENU.carte, ...MENU.desserts, ...MENU.boissons, ...MENU.milkTea, ...MENU.fruitTea];
 
   // Non-bento handlers
   const add = (id) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
   const remove = (id) => setCart(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
+
+  // Option-item handlers
+  const optionCount = (itemId) => optionSelections.filter(s => s.itemId === itemId).length;
+  const removeLastOptionItem = (itemId) => setOptionSelections(prev => {
+    const idx = prev.map(s => s.itemId).lastIndexOf(itemId);
+    if (idx < 0) return prev;
+    return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+  });
+  const confirmItemOptions = (selections) => {
+    setOptionSelections(prev => [...prev, {
+      uid: `${optionsItem.id}-${Date.now()}`,
+      itemId: optionsItem.id,
+      selections,
+    }]);
+    setOptionsItem(null);
+  };
 
   // Bento handlers
   const bentoCount = (menuId) => menuSelections.filter(s => s.menuId === menuId).length;
@@ -2559,7 +2629,12 @@ function MenuPage() {
     ...MENU.menus.find(m => m.id === sel.menuId),
     qty: 1, options: sel.options, uid: sel.uid,
   }));
-  const allCartItems = [...bentoCartItems, ...nonBentoCartItems];
+  const optionCartItems = optionSelections.map(sel => {
+    const base = flatItems.find(i => i.id === sel.itemId);
+    const priceAdj = Object.values(sel.selections).reduce((s, v) => s + (v.price || 0), 0);
+    return { ...base, qty: 1, options: sel.selections, uid: sel.uid, price: (base?.price || 0) + priceAdj };
+  });
+  const allCartItems = [...bentoCartItems, ...nonBentoCartItems, ...optionCartItems];
   const total = allCartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = allCartItems.reduce((s, i) => s + i.qty, 0);
 
@@ -2697,6 +2772,11 @@ function MenuPage() {
         <MenuCustomizer item={customizerItem} lang={lang} onConfirm={confirmBento} onClose={() => setCustomizerItem(null)} />
       )}
 
+      {/* Item options modal */}
+      {optionsItem && (
+        <ItemOptionsModal item={optionsItem} lang={lang} onConfirm={confirmItemOptions} onClose={() => setOptionsItem(null)} />
+      )}
+
       {/* Menu */}
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 16px 120px" }}>
         <Section title={T.sections.menus}>
@@ -2709,22 +2789,40 @@ function MenuPage() {
           ))}
         </Section>
         <Section title={T.sections.plats}>
-          {MENU.plats.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.plats.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />
+          )}
         </Section>
         <Section title={T.sections.banhMi}>
-          {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.banhMi.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
         </Section>
         <Section title={T.sections.boBun}>
           {MENU.boBun.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
         </Section>
         <Section title={T.sections.carte}>
-          {MENU.carte.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.carte.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />
+          )}
         </Section>
         <Section title={T.sections.desserts}>
-          {MENU.desserts.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+          {MENU.desserts.map(item => item.options
+            ? <ItemRow key={item.id} item={item} lang={lang} qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />
+            : <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />
+          )}
         </Section>
         <Section title={T.sections.boissons}>
           {MENU.boissons.map(item => <ItemRow key={item.id} item={item} lang={lang} qty={cart[item.id] || 0} onAdd={add} onRemove={remove} />)}
+        </Section>
+        <Section title={T.sections.milkTea}>
+          {MENU.milkTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
+        </Section>
+        <Section title={T.sections.fruitTea}>
+          {MENU.fruitTea.map(item => <ItemRow key={item.id} item={item} lang={lang}
+            qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} />)}
         </Section>
       </div>
 
