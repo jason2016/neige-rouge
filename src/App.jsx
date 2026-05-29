@@ -71,7 +71,7 @@ const MENU = {
   plats: [
     { id: "loclac", name: "Loc Lac", descZh: "越式铁板牛肉饭", price: 12.00, emoji: "🔥", options: [EGG_OPT] },
     { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
-    { id: "soupe", name: "Soupe de Raviolis (piquant ou non piquant)", descZh: "抄手汤 (辣 或 不辣)", price: 10.00, emoji: "🥟", options: [PIQUANT_OPT] },
+    { id: "soupe", name: "Soupe de Raviolis", descZh: "抄手汤", price: 10.00, emoji: "🥟", options: [PIQUANT_OPT] },
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
