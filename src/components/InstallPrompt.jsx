@@ -28,18 +28,11 @@ export default function InstallPrompt() {
   const [platform, setPlatform] = useState('desktop');
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-    if (window.navigator.standalone) return;
-    if (isDismissed()) return;
-
-    const plat = detectPlatform();
-    setPlatform(plat);
-    setShowPrompt(true);
-
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    // Takeout context: customers don't install the PWA. Suppress the browser-native
+    // install banner (preventDefault) AND never show our own bottom bar, so nothing
+    // ever covers the "Commander" / "Ajouter au panier" buttons. The owner's PAD is
+    // installed once manually and doesn't rely on this prompt.
+    const handler = (e) => { e.preventDefault(); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
