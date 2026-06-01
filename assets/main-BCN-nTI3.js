@@ -1,1 +1,0 @@
-import{c as o,j as r,r as t,A as s}from"./App-By-QGvQD.js";o.createRoot(document.getElementById("root")).render(r.jsx(t.StrictMode,{children:r.jsx(s,{})}));"serviceWorker"in navigator&&window.addEventListener("load",()=>{navigator.serviceWorker.register("/neige-rouge/sw.js").then(e=>console.log("SW registered:",e.scope)).catch(e=>console.error("SW registration failed:",e))});
