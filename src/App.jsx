@@ -46,19 +46,51 @@ const BANH_MI_MAYO_OPT      = { key: "mayo",      fr: "Mayonnaise",  zh: "蛋黄
   { value: "sans", fr: "Sans mayonnaise", zh: "不加蛋黄酱", price: 0 },
 ] };
 const BM_OPTS = [BANH_MI_SPICE_OPT, BANH_MI_CORIANDRE_OPT, BANH_MI_MAYO_OPT];
-// Optional Bubble Tea add-on (+4€). 3-way to preserve ice-level info from the old "+BT" items.
-// Price is summed automatically via the generic Σ v.price path (same as EGG_OPT).
+// Optional Bubble Tea add-on — 3 layers: (1) want it? (2) flavor (3) ice.
+// Price (+4€) is on layer 1 "Oui" ONLY; flavor + ice are price 0, so the generic
+// Σ v.price path adds 4€ exactly once. Layers 2/3 render only when layer 1 = Oui
+// (showIf), and ItemOptionsModal prunes their selections when layer 1 flips back to Non.
 const BT_ADDON_OPT = {
   key: "bubble_tea_addon",
   fr: "Bubble Tea (optionnel)",
   zh: "珍珠奶茶 (可选)",
   required: true,
   choices: [
-    { value: "no",        fr: "Non",                      zh: "不加",             price: 0 },
-    { value: "yes_ice",   fr: "Oui, avec glaçons (+4€)",  zh: "加, 要冰 (+4€)",   price: 4 },
-    { value: "yes_noice", fr: "Oui, sans glaçons (+4€)",  zh: "加, 不要冰 (+4€)", price: 4 },
+    { value: "no",  fr: "Non",        zh: "不加",     price: 0 },
+    { value: "yes", fr: "Oui (+4€)",  zh: "加 (+4€)", price: 4 },
   ],
 };
+const BT_WANTED = (sel) => sel.bubble_tea_addon?.value === "yes";
+const BT_FLAVOR_OPT = {
+  key: "bubble_tea_flavor",
+  fr: "Parfum du Bubble Tea",
+  zh: "珍珠奶茶口味",
+  required: true,
+  showIf: BT_WANTED,
+  choices: [
+    { value: "bt_coco",         fr: "Coco (thé au lait)",                 zh: "椰子奶茶",   price: 0 },
+    { value: "bt_mangue_lait",  fr: "Mangue (thé au lait)",               zh: "芒果奶茶",   price: 0 },
+    { value: "bt_fraise_lait",  fr: "Fraise (thé au lait)",               zh: "草莓奶茶",   price: 0 },
+    { value: "bt_taro",         fr: "Taro (thé au lait)",                 zh: "芋头奶茶",   price: 0 },
+    { value: "bt_citron",       fr: "Citron (thé aux fruits)",            zh: "柠檬果茶",   price: 0 },
+    { value: "bt_mangue_fruit", fr: "Mangue (thé aux fruits)",            zh: "芒果果茶",   price: 0 },
+    { value: "bt_fraise_fruit", fr: "Fraise (thé aux fruits)",            zh: "草莓果茶",   price: 0 },
+    { value: "bt_passion",      fr: "Fruit de la passion (thé aux fruits)", zh: "百香果果茶", price: 0 },
+    { value: "bt_litchi",       fr: "Litchi (thé aux fruits)",            zh: "荔枝果茶",   price: 0 },
+  ],
+};
+const BT_ICE_OPT = {
+  key: "bubble_tea_ice",
+  fr: "Glaçons (Bubble Tea)",
+  zh: "珍珠奶茶冰度",
+  required: true,
+  showIf: BT_WANTED,
+  choices: [
+    { value: "avec", fr: "Avec glaçons", zh: "加冰",   price: 0 },
+    { value: "sans", fr: "Sans glaçons", zh: "不加冰", price: 0 },
+  ],
+};
+const BT_OPTS = [BT_ADDON_OPT, BT_FLAVOR_OPT, BT_ICE_OPT];
 
 const MENU = {
   menus: [
@@ -75,12 +107,12 @@ const MENU = {
     { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
   ],
   banhMi: [
-    { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea en option +4€", descZh: "鸡肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
-    { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea en option +4€", descZh: "牛肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
-    { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea en option +4€", descZh: "素越南法棍 · 可加珍珠奶茶 +4€",     price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
-    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea en option +4€", descZh: "脆皮鸡越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
-    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea en option +4€", descZh: "焦糖猪肉越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, BT_ADDON_OPT] },
-    { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea en option +4€", descZh: "蜜汁烧猪越南法棍 · 可加珍珠奶茶 +4€", price: 6.00, options: [...BM_OPTS, BT_ADDON_OPT] },
+    { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea en option +4€", descZh: "鸡肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea en option +4€", descZh: "牛肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea en option +4€", descZh: "素越南法棍 · 可加珍珠奶茶 +4€",     price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea en option +4€", descZh: "脆皮鸡越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea en option +4€", descZh: "焦糖猪肉越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea en option +4€", descZh: "蜜汁烧猪越南法棍 · 可加珍珠奶茶 +4€", price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
@@ -1703,8 +1735,19 @@ function MenuCustomizer({ item, lang, onConfirm, onClose }) {
 
 function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
   const [selections, setSelections] = useState({});
-  const allSelected = item.options.every(opt => !opt.required || selections[opt.key]);
-  const pick = (key, choice) => setSelections(prev => ({ ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value, price: choice.price || 0 } }));
+  // Conditional groups: a group with showIf renders only when its predicate holds
+  // against the current selections (e.g. Bubble Tea flavor/ice appear only after "Oui").
+  const visibleOptions = item.options.filter(opt => !opt.showIf || opt.showIf(selections));
+  const allSelected = visibleOptions.every(opt => !opt.required || selections[opt.key]);
+  const pick = (key, choice) => setSelections(prev => {
+    const next = { ...prev, [key]: { fr: choice.fr, zh: choice.zh, value: choice.value, price: choice.price || 0 } };
+    // Prune selections for groups that are now hidden, so stale values never leak
+    // into price / cart / payload / kitchen (e.g. switching Bubble Tea Oui→Non).
+    for (const opt of item.options) {
+      if (opt.showIf && !opt.showIf(next) && next[opt.key]) delete next[opt.key];
+    }
+    return next;
+  });
   const priceAdj = Object.values(selections).reduce((s, v) => s + (v.price || 0), 0);
   const btnRef = useRef(null);
 
@@ -1726,7 +1769,7 @@ function ItemOptionsModal({ item, lang, onConfirm, onClose }) {
           </div>
           <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 20, cursor: "pointer", flexShrink: 0 }}>×</button>
         </div>
-        {item.options.map(opt => (
+        {visibleOptions.map(opt => (
           <div key={opt.key} style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }}>
               {lang === "zh" ? opt.zh : opt.fr}
@@ -2526,31 +2569,42 @@ function KitchenPanel() {
               </div>
               <div style={{ lineHeight: 1.3, marginBottom: "10px", borderTop: `1px solid ${isReady ? "rgba(255,255,255,0.3)" : "#444"}`, paddingTop: "8px" }}>
                 {items.map((item, i) => {
-                  // Bubble Tea add-on: show as a name suffix (not a ⭐ line). Value stored as the fr
-                  // label by the API payload; match on label or raw value to stay robust.
-                  const btRaw = item.options?.bubble_tea_addon;
-                  const btStr = typeof btRaw === "string" ? btRaw : (btRaw?.fr || btRaw?.value || "");
-                  let btSuffix = "";
-                  if (/avec gla|yes_ice/i.test(btStr)) btSuffix = " + Bubble Tea (avec glaçons)";
-                  else if (/sans gla|yes_noice/i.test(btStr)) btSuffix = " + Bubble Tea (sans glaçons)";
+                  // Bubble Tea (3 layers): combine addon + flavor + ice into ONE line so the
+                  // chef sees the full cup at a glance. Values stored as fr labels by the API
+                  // payload (match on label or raw value to stay robust). Show nothing if "Non".
+                  const optVal = (k) => { const v = item.options?.[k]; return typeof v === "string" ? v : (v?.fr || v?.value || ""); };
+                  const btWanted = /\boui\b|yes/i.test(optVal("bubble_tea_addon"));
+                  const btFlavor = optVal("bubble_tea_flavor");
+                  const btIce    = optVal("bubble_tea_ice");
+                  let btLine = "";
+                  if (btWanted) {
+                    const iceTxt = /sans|noice/i.test(btIce) ? "sans glaçons" : "avec glaçons";
+                    btLine = `Bubble Tea: ${btFlavor || "?"} · ${iceTxt}`;
+                  }
+                  const BT_KEYS = ["bubble_tea_addon", "bubble_tea_flavor", "bubble_tea_ice"];
                   const optLines = item.options
                     ? Object.entries(item.options)
-                        .filter(([k]) => k !== "bubble_tea_addon")
+                        .filter(([k]) => !BT_KEYS.includes(k))
                         .map(([, v]) => typeof v === "string" ? v : v?.fr)
                         .filter(Boolean)
                     : [];
                   return (
                   <div key={i} style={{ marginBottom: 8 }}>
                     <div style={{ fontSize: "26px", fontWeight: 800 }}>
-                      {item.name}{btSuffix} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 700 }}>×{item.qty}</span>
+                      {item.name} <span style={{ color: isReady ? "white" : "#d4a017", fontWeight: 700 }}>×{item.qty}</span>
                     </div>
-                    {optLines.length > 0 && (
+                    {(optLines.length > 0 || btLine) && (
                       <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
                         {optLines.map((opt, oi) => (
                             <div key={oi} style={{ color: "#fbbf24", fontSize: "22px", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                               <span>⭐</span><span>{opt}</span>
                             </div>
                           ))}
+                        {btLine && (
+                          <div style={{ color: "#34d399", fontSize: "22px", fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
+                            <span>🧋</span><span>{btLine}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
