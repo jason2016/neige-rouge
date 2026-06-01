@@ -124,6 +124,10 @@ const MENU = {
     { id: "temp", name: "4 Tempura Crevette", descZh: "4个炸虾天妇罗", price: 6.50 },
     { id: "nems", name: "2 Nems Poulet ou Légumes", descZh: "2个春卷（鸡肉或蔬菜）", price: 2.50, options: [NEM_TYPE_OPT] },
     { id: "rav", name: "2 Raviolis Poulet", descZh: "2个鸡肉饺子", price: 2.50 },
+    { id: "port-poulet",    name: "Portion de poulet croustillant", descZh: "脆皮鸡（小份）", price: 6.50 },
+    { id: "port-nouilles",  name: "Portion de nouilles",            descZh: "面条（小份）",   price: 3.00 },
+    { id: "port-riz-cant",  name: "Portion de riz cantonais",       descZh: "炒饭（小份）",   price: 3.00 },
+    { id: "port-riz-blanc", name: "Portion de riz blanc",           descZh: "白米饭（小份）", price: 3.00 },
   ],
   desserts: [
     { id: "coco", name: "Boule de Coco", descZh: "椰子球", price: 1.50 },
