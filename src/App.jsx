@@ -2492,6 +2492,9 @@ function KitchenPanel() {
   const countUnpaid = orders.filter(o => o.payment_status === "pending_counter").length;
   const countInProgress = orders.filter(o => o.payment_status === "paid" && (o.status === "pending" || o.status === "preparing")).length;
   const countReady = orders.filter(o => o.status === "ready").length;
+  // order_type split for the header: anything not "takeaway" counts as dine-in (matches backend default)
+  const countDineIn = orders.filter(o => o.order_type !== "takeaway").length;
+  const countTakeaway = orders.filter(o => o.order_type === "takeaway").length;
   const totalUnpaid = orders.filter(o => o.payment_status === "pending_counter").reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
@@ -2512,6 +2515,8 @@ function KitchenPanel() {
           <span style={{ background: "#d4a017", color: "#1a1a1a", fontSize: 16, fontWeight: 700, padding: "4px 14px", borderRadius: 12 }}>
             {orders.length} EN COURS
           </span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#93c5fd" }}>🍽 {countDineIn}</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#fdba74" }}>📦 {countTakeaway}</span>
         </div>
         <span style={{ fontSize: 22, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
       </div>
@@ -2531,6 +2536,11 @@ function KitchenPanel() {
           const elapsedStr = elapsed < 60 ? `${elapsed}min` : `${Math.floor(elapsed / 60)}h${elapsed % 60}`;
 
           const borderColor = isReady ? "#fff" : isUnpaid ? "#f59e0b" : "#22c55e";
+          // order_type: dine-in (blue) vs takeaway (orange). Empty/unknown → dine-in, matching
+          // the backend default; never let a bad value break the card.
+          const isDineIn = order.order_type !== "takeaway";
+          const otColor = isDineIn ? "#2563eb" : "#ea580c";
+          const otLabel = isDineIn ? "🍽 SUR PLACE · 堂食" : "📦 À EMPORTER · 外带";
           const priceColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "white";
           const statusLabel = isReady ? "🔔 PRÊT" : isUnpaid ? "⚠ Non payé" : "✓ Payé";
           const statusColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "#22c55e";
@@ -2550,11 +2560,24 @@ function KitchenPanel() {
             <div key={order.id} className={isReady ? "flash-red" : isNew ? "new-order-pulse" : ""} style={{
               padding: "14px",
               borderRadius: "8px",
-              borderLeft: `5px solid ${borderColor}`,
+              borderLeft: `6px solid ${otColor}`,
+              borderRight: (isReady || isUnpaid) ? `4px solid ${borderColor}` : undefined,
               background: isReady ? undefined : "#2d2d2d",
               color: "white",
               position: "relative",
+              overflow: "hidden",
             }}>
+              {/* order_type band — full width, readable across the kitchen at a glance */}
+              <div style={{
+                margin: "-14px -14px 12px -14px",
+                padding: "7px 14px",
+                background: otColor,
+                color: "white",
+                fontSize: "20px",
+                fontWeight: 800,
+                letterSpacing: "0.5px",
+                textAlign: "center",
+              }}>{otLabel}</div>
               {isNew && !isReady && (
                 <span style={{
                   position: "absolute", top: -10, right: -10,
