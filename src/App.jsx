@@ -356,6 +356,7 @@ const RESTAURANT_INFO = {
 
 const adminT = {
   fr: {
+    loadFailed: "Connexion au serveur impossible. Cette liste n'est pas à jour.", retry: "Réessayer",
     login: "Accès gestion", password: "Mot de passe", enter: "Entrer", wrong: "Mot de passe incorrect",
     title: "Gestion des commandes", date: "Date", today: "Aujourd'hui", tomorrow: "Demain",
     thisWeek: "Semaine", thisMonth: "Mois", from: "Du", to: "Au",
@@ -366,6 +367,7 @@ const adminT = {
     switchLang: "中文",
   },
   zh: {
+    loadFailed: "无法连接服务器，列表可能不是最新的。", retry: "重试",
     login: "管理登录", password: "密码", enter: "进入", wrong: "密码错误",
     title: "订单管理", date: "日期", today: "今天", tomorrow: "明天",
     thisWeek: "本周", thisMonth: "本月", from: "从", to: "至",
@@ -608,14 +610,19 @@ function CommandesTab() {
     setCheckingOut(p => ({ ...p, [order.id]: false }));
   };
 
+    // Un 503 renvoie un corps JSON : sans ce controle res.json() reussit,
+    // data.orders vaut undefined, et la liste se vide en silence.
+    const [loadErr, setLoadErr] = useState(false);
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       // v2.5.0: show all orders — dine_in and reservation (created by arrive_booking)
+        setLoadErr(false);
       setOrders(data.orders || []);
-    } catch { setOrders([]); }
+      } catch { setOrders([]); setLoadErr(true); }
     setLoading(false);
   };
 
@@ -644,10 +651,13 @@ function CommandesTab() {
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
         {[
-          { label: "Commandes", value: orders.length, color: "#8B0000" },
-          { label: "Total payé", value: `${totalAmt.toFixed(0)}€`, color: "#16a34a" },
-          { label: "En attente", value: pending, color: "#d97706" },
-          { label: "Terminées", value: done, color: "#6b7280" },
+          // Pendant une panne, ces quatre chiffres valent tous 0 : une salle
+          // vide et un serveur injoignable donnent le meme ecran. « — » dit
+          // ce que 0 ne dit pas — que la valeur est inconnue.
+          { label: "Commandes", value: loadErr ? "—" : orders.length, color: "#8B0000" },
+          { label: "Total payé", value: loadErr ? "—" : `${totalAmt.toFixed(0)}€`, color: "#16a34a" },
+          { label: "En attente", value: loadErr ? "—" : pending, color: "#d97706" },
+          { label: "Terminées", value: loadErr ? "—" : done, color: "#6b7280" },
         ].map((c, i) => (
           <div key={i} style={{ background: "white", borderRadius: 12, padding: "12px 8px", textAlign: "center", border: "1px solid #eee" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
@@ -659,6 +669,14 @@ function CommandesTab() {
       {/* Order list */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+        ) : loadErr ? (
+          <div style={{ textAlign: "center", padding: 16, margin: "0 0 12px", color: "#b91c1c",
+            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13 }}>
+            ⚠️ Connexion au serveur impossible. Cette liste n'est pas à jour.{" "}
+            <button onClick={() => fetchOrders(date)} style={{ marginLeft: 6, padding: "4px 12px",
+              borderRadius: 8, border: "1px solid #b91c1c", background: "white", color: "#b91c1c",
+              fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+          </div>
       ) : orders.length === 0 ? (
         <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>Aucune commande ce jour</div>
       ) : orders.map(order => {
@@ -945,14 +963,19 @@ function PendingPaymentsTab() {
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState({});
 
+    // Ecran le plus sensible : une liste vide y veut dire « personne ne doit
+    // rien ». Une panne ne doit surtout pas ressembler a cela.
+    const [loadErr, setLoadErr] = useState(false);
   const fetchPending = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${today}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const all = data.orders || [];
+        setLoadErr(false);
       setOrders(all.filter(o => o.payment_status === "pending_counter"));
-    } catch { setOrders([]); }
+      } catch { setOrders([]); setLoadErr(true); }
     setLoading(false);
   };
 
@@ -992,7 +1015,7 @@ function PendingPaymentsTab() {
         <div>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>💳 待前台刷卡</h2>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            {orders.length} commande{orders.length !== 1 ? "s" : ""} · auto-refresh 10s
+            {loadErr ? "—" : orders.length} commande{!loadErr && orders.length !== 1 ? "s" : ""} · auto-refresh 10s
           </p>
         </div>
         <button onClick={fetchPending} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: 14 }}>🔄</button>
@@ -1002,7 +1025,17 @@ function PendingPaymentsTab() {
         <p style={{ textAlign: "center", color: "#999", padding: "40px 0" }}>Chargement...</p>
       )}
 
-      {!loading && orders.length === 0 && (
+        {loadErr && (
+          <div style={{ textAlign: "center", padding: 16, margin: "0 0 12px", color: "#b91c1c",
+            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13 }}>
+            ⚠️ Connexion au serveur impossible. Cette liste n'est pas à jour.{" "}
+            <button onClick={fetchPending} style={{ marginLeft: 6, padding: "4px 12px",
+              borderRadius: 8, border: "1px solid #b91c1c", background: "white", color: "#b91c1c",
+              fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+          </div>
+        )}
+
+        {!loading && !loadErr && orders.length === 0 && (
         <div style={{ textAlign: "center", color: "#999", padding: "60px 20px" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
           <p style={{ margin: 0, fontSize: 15 }}>Aucun paiement en attente</p>
@@ -1054,13 +1087,16 @@ function RapportTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
+    const [loadErr, setLoadErr] = useState(false);
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+        setLoadErr(false);
       setOrders(data.orders || []);
-    } catch { setOrders([]); }
+      } catch { setOrders([]); setLoadErr(true); }
     setLoading(false);
   };
 
@@ -1089,6 +1125,14 @@ function RapportTab() {
       </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+        ) : loadErr ? (
+          <div style={{ textAlign: "center", padding: 16, margin: "0 0 12px", color: "#b91c1c",
+            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13 }}>
+            ⚠️ Connexion au serveur impossible. Cette liste n'est pas à jour.{" "}
+            <button onClick={() => fetchOrders(date)} style={{ marginLeft: 6, padding: "4px 12px",
+              borderRadius: 8, border: "1px solid #b91c1c", background: "white", color: "#b91c1c",
+              fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+          </div>
       ) : (
         <>
           <div style={{ background: "white", borderRadius: 14, padding: 20, marginBottom: 12, border: "1px solid #eee", textAlign: "center" }}>
@@ -1283,13 +1327,19 @@ function AdminPanel() {
 
   const A = adminT[lang];
 
+    const [loadErr, setLoadErr] = useState(false);
   const fetchRange = async (from, to) => {
     setLoading(true);
     try {
       const dates = getDatesInRange(from, to);
-      const results = await Promise.all(dates.map(d => fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`).then(r => r.json())));
+        const results = await Promise.all(dates.map(async d => {
+          const r = await fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }));
+        setLoadErr(false);
       setBookings(results.flatMap(r => r.bookings || []));
-    } catch { setBookings([]); }
+      } catch { setBookings([]); setLoadErr(true); }
     setLoading(false);
   };
 
@@ -1471,6 +1521,14 @@ function AdminPanel() {
         {/* Booking cards — two sections */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: "#999" }}>⏳</div>
+          ) : loadErr ? (
+            <div style={{ textAlign: "center", padding: 16, margin: "0 0 12px", color: "#b91c1c",
+              background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13 }}>
+              ⚠️ {A.loadFailed}{" "}
+              <button onClick={() => fetchRange(dateFrom, dateTo)} style={{ marginLeft: 6, padding: "4px 12px",
+                borderRadius: 8, border: "1px solid #b91c1c", background: "white", color: "#b91c1c",
+                fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{A.retry}</button>
+            </div>
         ) : bookings.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>{A.noBookings}</div>
         ) : (<>
