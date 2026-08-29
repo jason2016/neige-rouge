@@ -321,6 +321,13 @@ const t = {
 
 const API = import.meta.env.VITE_API_BASE || "https://mcp.clawshow.ai";
 const NS = import.meta.env.VITE_NAMESPACE || "neige-rouge";
+
+// KA2 : n'ajoute l'en-tete d'auth gestionnaire qu'aux appels du panneau admin.
+// Les vues cuisine / client n'utilisent jamais adminFetch (aucun impact).
+const adminFetch = (url, opts = {}) => {
+  const key = localStorage.getItem("nr_admin_key") || "";
+  return fetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Neige-Admin-Key": key } });
+};
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 
 // Feature flags — keyed by namespace so any restaurant can reuse this app
@@ -510,7 +517,7 @@ function InvoiceFormModal({ order, onClose }) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/neige-rouge/orders/${order.id}/invoice`, {
+      const res = await adminFetch(`${API}/api/neige-rouge/orders/${order.id}/invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, client_company: company.trim(), client_address: address.trim(), client_vat_number: vatNum.trim() }),
@@ -825,7 +832,7 @@ function StockTab() {
     const newValue = !inventoryEnabled;
     setInventoryEnabled(newValue);
     try {
-      await fetch(`${API}/api/settings/set`, {
+      await adminFetch(`${API}/api/settings/set`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, key: "inventory_enabled", value: newValue ? "true" : "false" }),
       });
@@ -868,7 +875,7 @@ function StockTab() {
       .map(item => ({ id: item.id, limit: parseInt(limits[item.id] || 0, 10) }))
       .filter(item => !isNaN(item.limit));
     try {
-      await fetch(`${API}/api/inventory/set`, {
+      await adminFetch(`${API}/api/inventory/set`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, date, items }),
       });
@@ -882,7 +889,7 @@ function StockTab() {
   const handleRestoreYesterday = async () => {
     setRestoring(true);
     try {
-      const res = await fetch(`${API}/api/inventory/restore-yesterday`, {
+      const res = await adminFetch(`${API}/api/inventory/restore-yesterday`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, date }),
       });
@@ -1315,7 +1322,7 @@ function WorkStationPanel() {
 function AdminPanel() {
   const [lang, setLang] = useState("fr");
   const [tab, setTab] = useState("commandes");
-  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1");
+  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1" && !!localStorage.getItem("nr_admin_key"));
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
   const today = new Date().toISOString().split("T")[0];
@@ -1359,7 +1366,7 @@ function AdminPanel() {
 
   const arriveBooking = async (b) => {
     try {
-      const res = await fetch(`${API}/api/neige-rouge/bookings/${b.id}/arrive`, {
+      const res = await adminFetch(`${API}/api/neige-rouge/bookings/${b.id}/arrive`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS }),
       });
@@ -1376,7 +1383,7 @@ function AdminPanel() {
   };
 
   const handleLogin = () => {
-    if (pwd === "neige2025") { localStorage.setItem("nr_admin", "1"); setAuthed(true); setPwdErr(false); }
+    if (pwd === "neige2025") { localStorage.setItem("nr_admin", "1"); localStorage.setItem("nr_admin_key", pwd); setAuthed(true); setPwdErr(false); }
     else setPwdErr(true);
   };
 
@@ -1440,7 +1447,7 @@ function AdminPanel() {
         <h1 style={{ color: "white", fontSize: 18, fontWeight: 700, margin: 0 }}>🔧 {A.title}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.switchLang}</button>
-          <button onClick={() => { localStorage.removeItem("nr_admin"); setAuthed(false); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.logout}</button>
+          <button onClick={() => { localStorage.removeItem("nr_admin"); localStorage.removeItem("nr_admin_key"); setAuthed(false); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.logout}</button>
         </div>
       </div>
 
