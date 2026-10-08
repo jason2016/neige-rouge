@@ -51,8 +51,8 @@ const BM_OPTS = [BANH_MI_SPICE_OPT, BANH_MI_CORIANDRE_OPT, BANH_MI_MAYO_OPT];
 // Σ v.price path adds it exactly once. Layers 2/3 render only when layer 1 = Oui
 // (showIf), and ItemOptionsModal prunes their selections when layer 1 flips back to Non.
 // The kitchen screen detects the add-on with /\boui\b|yes/ on the fr label: keep "Oui".
-// Menu 2026-10: "Banh mi + bubble tea 11,00€" whatever the Banh mi, so the add-on
-// price tops each Banh mi up to 11.00 (6.30 → +4.70, 6.70 → +4.30).
+// Bubble tea add-on = +4.70 on every Banh mi (restaurant, 2026-10-08): the formula
+// is 11,00€ on the 6.30 ones and 11,40€ on the 6.70 ones. Only the label differs.
 const btAddonOpt = (price, label) => ({
   key: "bubble_tea_addon",
   fr: "Bubble Tea (optionnel)",
@@ -63,8 +63,7 @@ const btAddonOpt = (price, label) => ({
     { value: "yes", fr: `Oui (${label.fr})`, zh: `加 (${label.zh})`, price },
   ],
 });
-const BT_ADDON_OPT = btAddonOpt(4, { fr: "+4€", zh: "+4€" });
-const BT_COMBO_11 = { fr: "formule 11,00€", zh: "套餐 11€" };
+const BT_ADDON_PRICE = 4.70;
 const BT_WANTED = (sel) => sel.bubble_tea_addon?.value === "yes";
 const BT_FLAVOR_OPT = {
   key: "bubble_tea_flavor",
@@ -95,9 +94,8 @@ const BT_ICE_OPT = {
     { value: "sans", fr: "Sans glaçons", zh: "不加冰", price: 0 },
   ],
 };
-const BT_OPTS = [BT_ADDON_OPT, BT_FLAVOR_OPT, BT_ICE_OPT];
-const BT_OPTS_630 = [btAddonOpt(4.70, BT_COMBO_11), BT_FLAVOR_OPT, BT_ICE_OPT];
-const BT_OPTS_670 = [btAddonOpt(4.30, BT_COMBO_11), BT_FLAVOR_OPT, BT_ICE_OPT];
+const BT_OPTS_630 = [btAddonOpt(BT_ADDON_PRICE, { fr: "formule 11,00€", zh: "套餐 11€" }),    BT_FLAVOR_OPT, BT_ICE_OPT];
+const BT_OPTS_670 = [btAddonOpt(BT_ADDON_PRICE, { fr: "formule 11,40€", zh: "套餐 11,40€" }), BT_FLAVOR_OPT, BT_ICE_OPT];
 
 const MENU = {
   menus: [
@@ -117,9 +115,9 @@ const MENU = {
     { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea : formule 11,00€", descZh: "鸡肉越南法棍 · 加珍珠奶茶套餐 11€",   price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
     { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea : formule 11,00€", descZh: "牛肉越南法棍 · 加珍珠奶茶套餐 11€",   price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
     { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea : formule 11,00€", descZh: "素越南法棍 · 加珍珠奶茶套餐 11€",     price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
-    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea : formule 11,00€", descZh: "脆皮鸡越南法棍 · 加珍珠奶茶套餐 11€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
-    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea : formule 11,00€", descZh: "焦糖猪肉越南法棍 · 加珍珠奶茶套餐 11€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
-    { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea en option +4€", descZh: "蜜汁烧猪越南法棍 · 可加珍珠奶茶 +4€", price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea : formule 11,40€", descZh: "脆皮鸡越南法棍 · 加珍珠奶茶套餐 11,40€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
+    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea : formule 11,40€", descZh: "焦糖猪肉越南法棍 · 加珍珠奶茶套餐 11,40€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
+    { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea : formule 11,00€", descZh: "蜜汁烧猪越南法棍 · 加珍珠奶茶套餐 11€", price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
   ],
   boBun: [
     { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 11.00, emoji: "🥩" },
