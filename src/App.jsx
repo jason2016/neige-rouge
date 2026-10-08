@@ -250,6 +250,17 @@ const MENU_OPTIONS = {
   },
 };
 
+// Sur place / à emporter, three states. Anything that is not exactly "dine_in" or
+// "takeaway" shows "?" — the kitchen must never get a guess presented as a fact.
+const orderTypeInfo = (t) =>
+  t === "dine_in"  ? { known: true,  icon: "🍽", fr: "Sur place",  zh: "堂食", up: "SUR PLACE",  color: "#2563eb" } :
+  t === "takeaway" ? { known: true,  icon: "📦", fr: "À emporter", zh: "打包", up: "À EMPORTER", color: "#ea580c" } :
+                     { known: false, icon: "❓", fr: "?",          zh: "?",    up: "?",          color: "#6b7280" };
+const orderTypeLine = (t) => {
+  const o = orderTypeInfo(t);
+  return o.known ? `${o.icon} ${o.fr} · ${o.zh}` : "❓ ?";
+};
+
 // Format options object for display: { side: {fr,zh}, base: {fr,zh} } → "Salade d'algues, Riz"
 const optStr = (options, lang) => {
   if (!options) return null;
@@ -420,7 +431,7 @@ function openTicket(order) {
   const dt = new Date(order.created_at);
   const dateStr = `${dt.getDate().toString().padStart(2,"0")}/${(dt.getMonth()+1).toString().padStart(2,"0")}/${dt.getFullYear()}`;
   const timeStr = `${dt.getHours().toString().padStart(2,"0")}:${dt.getMinutes().toString().padStart(2,"0")}`;
-  const typeStr = order.order_type === "dine_in" ? "Sur place" : "À emporter";
+  const typeStr = orderTypeInfo(order.order_type).fr;
   const pmLabels = { online: "Carte bancaire (en ligne)", card_counter: "Carte bancaire (sur place)", cash: "Espèces", card_terminal: "Terminal Stancer" };
   const payStr = order.payment_status === "paid" ? (pmLabels[order.payment_method] || "Carte (Stancer)") : "Non payé";
 
@@ -1982,7 +1993,10 @@ function OrderPage() {
       .then(r => r.json()).then(d => setStock(d.stock || {})).catch(() => {});
   }, []);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [orderType, setOrderType] = useState("dine_in");
+  // No default on purpose: a preselected "Sur place" reaches the kitchen as a confident
+  // but unchosen answer (and drives the VAT rate on the receipt). null = not chosen yet.
+  const [orderType, setOrderType] = useState(null);
+  const [orderTypeMissing, setOrderTypeMissing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -2049,6 +2063,11 @@ function OrderPage() {
 
   const handleSubmit = async () => {
     if (allCartItems.length === 0) return;
+    if (orderType !== "dine_in" && orderType !== "takeaway") {
+      setOrderTypeMissing(true);
+      setSubmitError(lang === "zh" ? "请选择：堂食 或 打包" : "Veuillez choisir : Sur place ou À emporter");
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -2203,14 +2222,17 @@ function OrderPage() {
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#8B0000" }}>{total.toFixed(2)}€</span>
               </div>
             </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: orderTypeMissing ? "#dc2626" : "#666", marginBottom: 6 }}>
+              {lang === "zh" ? "堂食还是打包？" : "Sur place ou à emporter ?"} <span style={{ color: "#8B0000" }}>*</span>
+            </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {[{ key: "dine_in", fr: "Sur place", zh: "堂食" }, { key: "takeaway", fr: "À emporter", zh: "外带" }].map(opt => (
-                <button key={opt.key} onClick={() => setOrderType(opt.key)} style={{
-                  flex: 1, padding: 14, borderRadius: 10,
-                  border: orderType === opt.key ? "2px solid #8B0000" : "1px solid #ddd",
-                  background: orderType === opt.key ? "rgba(139,0,0,0.05)" : "white",
-                  color: orderType === opt.key ? "#8B0000" : "#999",
-                  fontSize: 16, fontWeight: 700, cursor: "pointer",
+              {[{ key: "dine_in", fr: "🍽 Sur place", zh: "🍽 堂食" }, { key: "takeaway", fr: "📦 À emporter", zh: "📦 打包" }].map(opt => (
+                <button key={opt.key} onClick={() => { setOrderType(opt.key); setOrderTypeMissing(false); setSubmitError(""); }} style={{
+                  flex: 1, padding: 20, borderRadius: 12,
+                  border: orderType === opt.key ? "3px solid #8B0000" : orderTypeMissing ? "2px solid #dc2626" : "1.5px solid #ddd",
+                  background: orderType === opt.key ? "rgba(139,0,0,0.08)" : "white",
+                  color: orderType === opt.key ? "#8B0000" : "#555",
+                  fontSize: 19, fontWeight: 800, cursor: "pointer",
                 }}>{lang === "zh" ? opt.zh : opt.fr}</button>
               ))}
             </div>
@@ -2290,7 +2312,7 @@ function KitchenTicketModal({ order, onPrint, onSkip, onLater }) {
 <div class="center" style="font-size:11px;">7 rue des Ursulines, 75005 Paris</div>
 <div class="divider"></div>
 <div class="big">${order.order_number}</div>
-<div class="center" style="margin-bottom:4px;">${order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
+<div class="center bold" style="font-size:18px; margin-bottom:4px;">${orderTypeLine(order.order_type)}</div>
 <div class="center" style="font-size:11px;">${new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — Imprimé ${timeStr}</div>
 <div class="divider"></div>
 ${items.map(item => `
@@ -2329,7 +2351,7 @@ ${item.options ? `<div class="opt">${Object.values(item.options).map(v => typeof
           <div style={{ textAlign: "center", fontSize: 11, color: "#555" }}>7 rue des Ursulines, 75005 Paris</div>
           <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
           <div style={{ textAlign: "center", fontSize: 36, fontWeight: 700, color: "#8B0000", margin: "6px 0" }}>{order.order_number}</div>
-          <div style={{ textAlign: "center", fontSize: 13, marginBottom: 4 }}>{order.order_type === "dine_in" ? "🍽 Sur place · 堂食" : "📦 À emporter · 外带"}</div>
+          <div style={{ textAlign: "center", fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{orderTypeLine(order.order_type)}</div>
           <div style={{ textAlign: "center", fontSize: 11, color: "#777" }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""} — Imprimé {timeStr}</div>
           <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
           {items.map((item, i) => (
@@ -2563,9 +2585,10 @@ function KitchenPanel() {
   const countUnpaid = orders.filter(o => o.payment_status === "pending_counter").length;
   const countInProgress = orders.filter(o => o.payment_status === "paid" && (o.status === "pending" || o.status === "preparing")).length;
   const countReady = orders.filter(o => o.status === "ready").length;
-  // order_type split for the header: anything not "takeaway" counts as dine-in (matches backend default)
-  const countDineIn = orders.filter(o => o.order_type !== "takeaway").length;
+  // order_type split for the header: unknown values are counted apart, never folded into dine-in
+  const countDineIn = orders.filter(o => o.order_type === "dine_in").length;
   const countTakeaway = orders.filter(o => o.order_type === "takeaway").length;
+  const countTypeUnknown = orders.length - countDineIn - countTakeaway;
   const totalUnpaid = orders.filter(o => o.payment_status === "pending_counter").reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
@@ -2588,6 +2611,7 @@ function KitchenPanel() {
           </span>
           <span style={{ fontSize: 16, fontWeight: 700, color: "#93c5fd" }}>🍽 {countDineIn}</span>
           <span style={{ fontSize: 16, fontWeight: 700, color: "#fdba74" }}>📦 {countTakeaway}</span>
+          {countTypeUnknown > 0 && <span style={{ fontSize: 16, fontWeight: 700, color: "#d1d5db" }}>❓ {countTypeUnknown}</span>}
         </div>
         <span style={{ fontSize: 22, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
       </div>
@@ -2607,11 +2631,10 @@ function KitchenPanel() {
           const elapsedStr = elapsed < 60 ? `${elapsed}min` : `${Math.floor(elapsed / 60)}h${elapsed % 60}`;
 
           const borderColor = isReady ? "#fff" : isUnpaid ? "#f59e0b" : "#22c55e";
-          // order_type: dine-in (blue) vs takeaway (orange). Empty/unknown → dine-in, matching
-          // the backend default; never let a bad value break the card.
-          const isDineIn = order.order_type !== "takeaway";
-          const otColor = isDineIn ? "#2563eb" : "#ea580c";
-          const otLabel = isDineIn ? "🍽 SUR PLACE · 堂食" : "📦 À EMPORTER · 外带";
+          // order_type: dine-in (blue) / takeaway (orange) / unknown (grey "?", never a guess).
+          const ot = orderTypeInfo(order.order_type);
+          const otColor = ot.color;
+          const otLabel = ot.known ? `${ot.icon} ${ot.up} · ${ot.zh}` : "❓ ?";
           const priceColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "white";
           const statusLabel = isReady ? "🔔 PRÊT" : isUnpaid ? "⚠ Non payé" : "✓ Payé";
           const statusColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "#22c55e";
@@ -2641,11 +2664,11 @@ function KitchenPanel() {
               {/* order_type band — full width, readable across the kitchen at a glance */}
               <div style={{
                 margin: "-14px -14px 12px -14px",
-                padding: "7px 14px",
+                padding: "10px 14px",
                 background: otColor,
                 color: "white",
-                fontSize: "20px",
-                fontWeight: 800,
+                fontSize: "30px",  /* >= item name (26px): the first thing read on the card */
+                fontWeight: 900,
                 letterSpacing: "0.5px",
                 textAlign: "center",
               }}>{otLabel}</div>
