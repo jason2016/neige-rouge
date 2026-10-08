@@ -47,19 +47,24 @@ const BANH_MI_MAYO_OPT      = { key: "mayo",      fr: "Mayonnaise",  zh: "蛋黄
 ] };
 const BM_OPTS = [BANH_MI_SPICE_OPT, BANH_MI_CORIANDRE_OPT, BANH_MI_MAYO_OPT];
 // Optional Bubble Tea add-on — 3 layers: (1) want it? (2) flavor (3) ice.
-// Price (+4€) is on layer 1 "Oui" ONLY; flavor + ice are price 0, so the generic
-// Σ v.price path adds 4€ exactly once. Layers 2/3 render only when layer 1 = Oui
+// Price is on layer 1 "Oui" ONLY; flavor + ice are price 0, so the generic
+// Σ v.price path adds it exactly once. Layers 2/3 render only when layer 1 = Oui
 // (showIf), and ItemOptionsModal prunes their selections when layer 1 flips back to Non.
-const BT_ADDON_OPT = {
+// The kitchen screen detects the add-on with /\boui\b|yes/ on the fr label: keep "Oui".
+// Menu 2026-10: "Banh mi + bubble tea 11,00€" whatever the Banh mi, so the add-on
+// price tops each Banh mi up to 11.00 (6.30 → +4.70, 6.70 → +4.30).
+const btAddonOpt = (price, label) => ({
   key: "bubble_tea_addon",
   fr: "Bubble Tea (optionnel)",
   zh: "珍珠奶茶 (可选)",
   required: true,
   choices: [
-    { value: "no",  fr: "Non",        zh: "不加",     price: 0 },
-    { value: "yes", fr: "Oui (+4€)",  zh: "加 (+4€)", price: 4 },
+    { value: "no",  fr: "Non", zh: "不加", price: 0 },
+    { value: "yes", fr: `Oui (${label.fr})`, zh: `加 (${label.zh})`, price },
   ],
-};
+});
+const BT_ADDON_OPT = btAddonOpt(4, { fr: "+4€", zh: "+4€" });
+const BT_COMBO_11 = { fr: "formule 11,00€", zh: "套餐 11€" };
 const BT_WANTED = (sel) => sel.bubble_tea_addon?.value === "yes";
 const BT_FLAVOR_OPT = {
   key: "bubble_tea_flavor",
@@ -91,40 +96,43 @@ const BT_ICE_OPT = {
   ],
 };
 const BT_OPTS = [BT_ADDON_OPT, BT_FLAVOR_OPT, BT_ICE_OPT];
+const BT_OPTS_630 = [btAddonOpt(4.70, BT_COMBO_11), BT_FLAVOR_OPT, BT_ICE_OPT];
+const BT_OPTS_670 = [btAddonOpt(4.30, BT_COMBO_11), BT_FLAVOR_OPT, BT_ICE_OPT];
 
 const MENU = {
   menus: [
-    { id: "A", name: "Menu A", desc: "2 Nems légumes + Salade d'algues ou omelette nature/piquant + Nouilles ou riz", descZh: "2个蔬菜春卷 + 海藻沙拉或煎蛋 + 面或饭", price: 7.50 },
-    { id: "B", name: "Menu B", desc: "2 Nems poulet ou salade d'algues + poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "2个鸡肉春卷或海藻沙拉 + 脆皮鸡/焦糖猪肉/叉烧 + 面或饭", price: 10.00 },
-    { id: "C", name: "Menu C", desc: "Poulet croustillant + Porc caramel ou porc laqué ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "脆皮鸡 + 焦糖猪肉/叉烧/2个虾卷 + 面或饭", price: 11.00 },
+    { id: "A", name: "Menu A", desc: "2 Nems légumes + Salade d'algues ou omelette nature/piquant + Nouilles ou riz", descZh: "2个蔬菜春卷 + 海藻沙拉或煎蛋 + 面或饭", price: 7.80 },
+    { id: "B", name: "Menu B", desc: "2 Nems poulet ou salade d'algues + poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "2个鸡肉春卷或海藻沙拉 + 脆皮鸡/焦糖猪肉/叉烧 + 面或饭", price: 10.50 },
+    { id: "C", name: "Menu C", desc: "Poulet croustillant + Porc caramel ou porc laqué ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "脆皮鸡 + 焦糖猪肉/叉烧/2个虾卷 + 面或饭", price: 11.50 },
     { id: "D", name: "Menu D", desc: "Poulet croustillant ou porc caramel ou porc laqué + Nouilles ou riz", descZh: "脆皮鸡或焦糖猪肉或叉烧 + 面或饭", price: 8.00 },
-    { id: "F", name: "Menu F", desc: "3 Nems Poulet ou 3 Nems Légumes ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷 或 3个蔬菜春卷 或3个饺子或2个虾卷 + 面或饭", price: 6.00 },
+    { id: "F", name: "Menu F", desc: "3 Nems Poulet ou 3 Nems Légumes ou 3 raviolis ou 2 papillotes de crevettes + Nouilles ou riz", descZh: "3个鸡肉春卷 或 3个蔬菜春卷 或3个饺子或2个虾卷 + 面或饭", price: 6.30 },
   ],
   plats: [
     { id: "loclac", name: "Loc Lac", descZh: "越式铁板牛肉饭", price: 12.00, emoji: "🔥", options: [EGG_OPT] },
     { id: "curry", name: "Curry Cheese Poulet Croustillant", descZh: "咖喱芝士脆皮鸡", price: 12.00, emoji: "🍛" },
-    { id: "soupe", name: "Soupe de Raviolis", descZh: "抄手汤", price: 10.00, emoji: "🥟", options: [PIQUANT_OPT] },
-    { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 9.00, emoji: "🍋" },
+    { id: "soupe", name: "Soupe de Raviolis", descZh: "抄手汤", price: 11.00, emoji: "🥟", options: [PIQUANT_OPT] },
+    { id: "citron", name: "Poulet Citronnelle", descZh: "香茅鸡", price: 10.00, emoji: "🍋" },
   ],
   banhMi: [
-    { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea en option +4€", descZh: "鸡肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
-    { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea en option +4€", descZh: "牛肉越南法棍 · 可加珍珠奶茶 +4€",   price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
-    { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea en option +4€", descZh: "素越南法棍 · 可加珍珠奶茶 +4€",     price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
-    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea en option +4€", descZh: "脆皮鸡越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, ...BT_OPTS] },
-    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea en option +4€", descZh: "焦糖猪肉越南法棍 · 可加珍珠奶茶 +4€", price: 6.40, options: [...BM_OPTS, ...BT_OPTS] },
+    { id: "bm-poulet",              name: "Banh Mi Poulet",              desc: "+ Bubble Tea : formule 11,00€", descZh: "鸡肉越南法棍 · 加珍珠奶茶套餐 11€",   price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
+    { id: "bm-boeuf",               name: "Banh Mi Boeuf",               desc: "+ Bubble Tea : formule 11,00€", descZh: "牛肉越南法棍 · 加珍珠奶茶套餐 11€",   price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
+    { id: "bm-veg",                 name: "Banh Mi Végétarien",          desc: "+ Bubble Tea : formule 11,00€", descZh: "素越南法棍 · 加珍珠奶茶套餐 11€",     price: 6.30, options: [...BM_OPTS, ...BT_OPTS_630] },
+    { id: "bm-poulet-croustillant", name: "Banh Mi Poulet Croustillant", desc: "+ Bubble Tea : formule 11,00€", descZh: "脆皮鸡越南法棍 · 加珍珠奶茶套餐 11€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
+    { id: "bm-porc-caramel",        name: "Banh Mi Porc Caramel",        desc: "+ Bubble Tea : formule 11,00€", descZh: "焦糖猪肉越南法棍 · 加珍珠奶茶套餐 11€", price: 6.70, options: [...BM_OPTS, ...BT_OPTS_670] },
     { id: "bm-porc-laque",          name: "Banh Mi Porc Laqué",          desc: "+ Bubble Tea en option +4€", descZh: "蜜汁烧猪越南法棍 · 可加珍珠奶茶 +4€", price: 6.00, options: [...BM_OPTS, ...BT_OPTS] },
   ],
   boBun: [
-    { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 10.50, emoji: "🥩" },
-    { id: "bobun-p", name: "Bò Bún Poulet", descZh: "鸡肉米粉沙拉", price: 10.50, emoji: "🍗" },
-    { id: "bobun-v", name: "Bò Bún Végétarien", descZh: "素米粉沙拉", price: 10.50, emoji: "🥬" },
+    { id: "bobun-b", name: "Bò Bún Boeuf", descZh: "牛肉米粉沙拉", price: 11.00, emoji: "🥩" },
+    { id: "bobun-p", name: "Bò Bún Poulet", descZh: "鸡肉米粉沙拉", price: 11.00, emoji: "🍗" },
+    { id: "bobun-v", name: "Bò Bún Végétarien", descZh: "素米粉沙拉", price: 11.00, emoji: "🥬" },
   ],
   carte: [
     { id: "pap", name: "4 Papillotes de Crevettes", descZh: "4个虾卷", price: 6.50 },
     { id: "temp", name: "4 Tempura Crevette", descZh: "4个炸虾天妇罗", price: 6.50 },
     { id: "nems", name: "2 Nems Poulet ou Légumes", descZh: "2个春卷（鸡肉或蔬菜）", price: 2.50, options: [NEM_TYPE_OPT] },
     { id: "rav", name: "2 Raviolis Poulet", descZh: "2个鸡肉饺子", price: 2.50 },
-    { id: "port-poulet",    name: "Portion de poulet croustillant", descZh: "脆皮鸡（小份）", price: 6.50 },
+    { id: "salade-algues", name: "Salade d'algues", descZh: "海藻沙拉", price: 3.50 },
+    { id: "port-poulet",    name: "Poulet croustillant",            descZh: "脆皮鸡",         price: 6.50 },
     { id: "port-nouilles",  name: "Portion de nouilles",            descZh: "面条（小份）",   price: 3.00 },
     { id: "port-riz-cant",  name: "Portion de riz cantonais",       descZh: "炒饭（小份）",   price: 3.00 },
     { id: "port-riz-blanc", name: "Portion de riz blanc",           descZh: "白米饭（小份）", price: 3.00 },
