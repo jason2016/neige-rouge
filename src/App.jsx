@@ -273,7 +273,7 @@ const t = {
     subtitle: "Cuisine Vietnamienne Authentique",
     tagline: "红雪 · Depuis 2015",
     nav: { menu: "Carte", order: "Commander", contact: "Contact" },
-    sections: { menus: "Menu Bento", plats: "Plats", banhMi: "Banh Mi", boBun: "Bò Bún", carte: "À la Carte", desserts: "Desserts", boissons: "Boissons", milkTea: "Thé au lait", fruitTea: "Thé aux fruits" },
+    sections: { menus: "Menu Bento", plats: "Plats", banhMi: "Banh Mi", boBun: "Bò Bún", carte: "À la Carte", desserts: "Desserts", boissons: "Boissons", milkTea: "Bubble Tea · Thé au lait", fruitTea: "Bubble Tea · Thé aux fruits" },
     order: {
       title: "Votre commande",
       empty: "Votre panier est vide",
@@ -306,7 +306,7 @@ const t = {
     subtitle: "正宗越南料理",
     tagline: "Neige Rouge · 始于2015",
     nav: { menu: "菜单", order: "下单", contact: "联系" },
-    sections: { menus: "便当套餐", plats: "主菜", banhMi: "越南法棍", boBun: "米粉沙拉", carte: "单点", desserts: "甜点", boissons: "饮品", milkTea: "奶茶", fruitTea: "水果茶" },
+    sections: { menus: "便当套餐", plats: "主菜", banhMi: "越南法棍", boBun: "米粉沙拉", carte: "单点", desserts: "甜点", boissons: "饮品", milkTea: "珍珠奶茶", fruitTea: "珍珠果茶" },
     order: {
       title: "您的订单",
       empty: "购物车为空",
