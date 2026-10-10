@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import InstallPrompt from "./components/InstallPrompt";
 import { SuiviPage, ComptoirPage, EcranPrets, ReglagePosteComptoir } from "./components/Suivi";
-import { estPosteComptoir, activerPosteComptoir, demandeModeComptoir, MOT_DE_PASSE_PERSONNEL } from "./components/posteComptoir";
+import { estPosteComptoir, activerPosteComptoir, demandeModeComptoir } from "./components/posteComptoir";
+import { sessionValide, connecterPersonnel, deconnecterPersonnel, fetchPersonnel, EVT_SESSION_EXPIREE, messageErreurConnexion } from "./components/sessionPersonnel";
 
 const SPICE_CHOICES = [
   { value: "no_spicy", fr: "Non piquant", zh: "不辣" },
@@ -602,7 +603,7 @@ function CommandesTab() {
     const amount = parseFloat(confirmAmounts[order.id] ?? order.total_amount);
     setConfirming(p => ({ ...p, [order.id]: true }));
     try {
-      const res = await fetch(`${API}/api/order/${order.id}/confirm-payment`, {
+      const res = await adminFetch(`${API}/api/order/${order.id}/confirm-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, payment_method: order.payment_method || "card_counter", amount_received: amount }),
@@ -618,7 +619,7 @@ function CommandesTab() {
   const handleCheckout = async (order) => {
     setCheckingOut(p => ({ ...p, [order.id]: true }));
     try {
-      const res = await fetch(`${API}/api/neige-rouge/orders/${order.id}/checkout`, {
+      const res = await adminFetch(`${API}/api/neige-rouge/orders/${order.id}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS }),
@@ -645,7 +646,7 @@ function CommandesTab() {
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      const res = await adminFetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       // v2.5.0: show all orders — dine_in and reservation (created by arrive_booking)
@@ -998,7 +999,7 @@ function PendingPaymentsTab() {
   const fetchPending = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${today}`);
+      const res = await adminFetch(`${API}/api/order/history?namespace=${NS}&date=${today}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const all = data.orders || [];
@@ -1018,7 +1019,7 @@ function PendingPaymentsTab() {
     if (!window.confirm(`确认已收到客人前台刷卡？\nCommande #${order.order_number} — ${(order.total_amount || 0).toFixed(2)} €`)) return;
     setConfirming(p => ({ ...p, [order.id]: true }));
     try {
-      const res = await fetch(`${API}/api/order/${order.id}/confirm-payment`, {
+      const res = await adminFetch(`${API}/api/order/${order.id}/confirm-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, payment_method: "card_counter", amount_received: order.total_amount || 0 }),
@@ -1120,7 +1121,7 @@ function RapportTab() {
   const fetchOrders = async (d) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
+      const res = await adminFetch(`${API}/api/order/history?namespace=${NS}&date=${d}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
         setLoadErr(false);
@@ -1212,7 +1213,14 @@ function RapportTab() {
 }
 
 function WorkStationPanel() {
-  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_workstation") === "1");
+  const [authed, setAuthed] = useState(sessionValide);
+  const [sessionExpiree, setSessionExpiree] = useState(false);
+  useEffect(() => {
+    const expire = () => { setAuthed(false); setSessionExpiree(true); };
+    window.addEventListener(EVT_SESSION_EXPIREE, expire);
+    const t = setInterval(() => { if (!sessionValide()) expire(); }, 30000);
+    return () => { window.removeEventListener(EVT_SESSION_EXPIREE, expire); clearInterval(t); };
+  }, []);
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -1229,7 +1237,7 @@ function WorkStationPanel() {
     if (!authed) return;
     const poll = async () => {
       try {
-        const r = await fetch(`${API}/api/orders?namespace=${NS}&status=pending,preparing`);
+        const r = await fetchPersonnel(`${API}/api/order/queue?namespace=${NS}`);  // /api/orders n'a jamais existe (404)
         const d = await r.json();
         const newOrders = (d.orders || []).filter(o => {
           if (o.status === "picked" || o.status === "ready") return false;
@@ -1247,9 +1255,9 @@ function WorkStationPanel() {
     return () => clearInterval(interval);
   }, [authed]);
 
-  const handleLogin = () => {
-    if (pwd === "workstation2025") { localStorage.setItem("nr_workstation", "1"); setAuthed(true); setPwdErr(false); }
-    else setPwdErr(true);
+  const handleLogin = async () => {
+    const r = await connecterPersonnel(pwd);
+    if (r.ok) { setAuthed(true); setPwdErr(false); setSessionExpiree(false); } else setPwdErr(messageErreurConnexion(r.erreur));
   };
 
   if (!authed) {
@@ -1259,11 +1267,14 @@ function WorkStationPanel() {
         <div style={{ background: "#1e293b", borderRadius: 16, padding: 32, width: 320, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📺</div>
           <h2 style={{ color: "#f97316", fontSize: 22, marginBottom: 20 }}>Station · 备餐台</h2>
+          {sessionExpiree && <div data-nr="session-expiree" style={{ color: "#fbbf24", fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+            Session expirée — reconnectez-vous · 登录已过期,请重新登录
+          </div>}
           <input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdErr(false); }}
             onKeyDown={e => e.key === "Enter" && handleLogin()}
             placeholder="Mot de passe"
             style={{ width: "100%", padding: 14, borderRadius: 10, border: pwdErr ? "2px solid #dc2626" : "1px solid #334155", background: "#0f172a", color: "white", fontSize: 16, boxSizing: "border-box", marginBottom: 12, outline: "none" }} />
-          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>Mot de passe incorrect</div>}
+          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{pwdErr === true ? "Mot de passe incorrect" : pwdErr}</div>}
           <button onClick={handleLogin} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#f97316", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Entrer</button>
         </div>
       </div>
@@ -1279,7 +1290,7 @@ function WorkStationPanel() {
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>📺 Station · 备餐台</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20 }}>{clock}</span>
-          <button onClick={() => { localStorage.removeItem("nr_workstation"); setAuthed(false); }}
+          <button onClick={() => { deconnecterPersonnel(); setAuthed(false); }}
             style={{ background: "rgba(0,0,0,0.2)", border: "none", color: "white", padding: "6px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Déconnexion</button>
         </div>
       </div>
@@ -1362,7 +1373,7 @@ function AdminPanel() {
     try {
       const dates = getDatesInRange(from, to);
         const results = await Promise.all(dates.map(async d => {
-          const r = await fetch(`${API}/api/bookings?namespace=${NS}&date=${d}`);
+          const r = await adminFetch(`${API}/api/bookings?namespace=${NS}&date=${d}`);
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json();
         }));
@@ -1379,7 +1390,7 @@ function AdminPanel() {
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const updateStatus = async (id, status) => {
-    await fetch(`${API}/api/booking/${id}`, {
+    await adminFetch(`${API}/api/booking/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS, status }),
     });
@@ -1404,9 +1415,14 @@ function AdminPanel() {
     }
   };
 
-  const handleLogin = () => {
-    if (pwd === "neige2025") { localStorage.setItem("nr_admin", "1"); localStorage.setItem("nr_admin_key", pwd); setAuthed(true); setPwdErr(false); }
-    else setPwdErr(true);
+  const handleLogin = async () => {
+    // Verification par le serveur (la cle d'admin n'est plus ecrite dans le bundle).
+    try {
+      const r = await fetch(`${API}/api/staff/verifier?namespace=${NS}`, { headers: { "X-Neige-Admin-Key": pwd } });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.admin) { localStorage.setItem("nr_admin", "1"); localStorage.setItem("nr_admin_key", pwd); setAuthed(true); setPwdErr(false); return; }
+    } catch { /* reseau : refus ci-dessous */ }
+    setPwdErr(true);
   };
 
   const tmr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
@@ -1993,10 +2009,12 @@ function OrderPage() {
   const [connexionComptoir, setConnexionComptoir] = useState(() => demandeModeComptoir() && !estPosteComptoir());
   const [mdpComptoir, setMdpComptoir] = useState("");
   const [mdpComptoirErreur, setMdpComptoirErreur] = useState(false);
-  const validerComptoir = () => {
-    if (mdpComptoir === MOT_DE_PASSE_PERSONNEL && activerPosteComptoir()) {
-      setModeComptoir(true); setConnexionComptoir(false); setMdpComptoirErreur(false);
-    } else setMdpComptoirErreur(true);
+  const [comptoirExpire, setComptoirExpire] = useState(() => estPosteComptoir() && !sessionValide());
+  const validerComptoir = async () => {
+    const r = await connecterPersonnel(mdpComptoir);   // verifie par le serveur
+    if (r.ok && activerPosteComptoir()) {
+      setModeComptoir(true); setConnexionComptoir(false); setMdpComptoirErreur(false); setComptoirExpire(false); setMdpComptoir("");
+    } else setMdpComptoirErreur(messageErreurConnexion(r.erreur, lang));
   };
   const [cart, setCart] = useState({});               // non-bento, no-option items: { [id]: qty }
   const [menuSelections, setMenuSelections] = useState([]); // bento: [{uid, menuId, options}]
@@ -2081,6 +2099,12 @@ function OrderPage() {
 
   const handleSubmit = async () => {
     if (allCartItems.length === 0) return;
+    if (estPosteComptoir() && !sessionValide()) {
+      // Poste comptoir dont la session a expire : on redemande la connexion au lieu de passer la
+      // commande en « client » sans le dire.
+      setComptoirExpire(true); setConnexionComptoir(true); setShowConfirm(false);
+      return;
+    }
     if (orderType !== "dine_in" && orderType !== "takeaway") {
       setOrderTypeMissing(true);
       setSubmitError(lang === "zh" ? "请选择：堂食 或 打包" : "Veuillez choisir : Sur place ou À emporter");
@@ -2090,7 +2114,7 @@ function OrderPage() {
     setSubmitError("");
     try {
       // Create order — payment method chosen on next page
-      const orderRes = await fetch(`${API}/api/order/create`, {
+      const orderRes = await (estPosteComptoir() ? fetchPersonnel : fetch)(`${API}/api/order/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2119,7 +2143,7 @@ function OrderPage() {
         headers: { "Content-Type": "application/json" },
         // namespace explicite : sans lui le serveur suppose « neige-rouge » (backlog
         // 2026-10-08-restaurant-checkout-namespace) et la commande d'un autre espace resterait non vue.
-        body: JSON.stringify({ namespace: NS, payment_method: "card_counter" }),
+        body: JSON.stringify({ namespace: NS, payment_method: "card_counter", suivi_token: orderData.suivi_token }),
       }).catch(() => {}); // non-fatal: customer still goes to counter screen
       // Persist order data for payment pages
       sessionStorage.setItem("nr_pending_order_id", orderData.order_id);
@@ -2129,6 +2153,7 @@ function OrderPage() {
         name: i.name, qty: i.qty, price: i.price, options: i.options,
       }))));
       sessionStorage.setItem("nr_pending_lang", lang);
+      if (orderData.suivi_token) sessionStorage.setItem("nr_pending_suivi_token", orderData.suivi_token);
       if (orderData.suivi_token) {
         // Le jeton (aleatoire) est la seule cle de la page de suivi ; jamais l'id ni le numero.
         window.location.hash = estPosteComptoir()
@@ -2166,6 +2191,9 @@ function OrderPage() {
         {modeComptoir && (
           <div data-nr="badge-comptoir" style={{ display: "inline-block", marginTop: 6, background: "#facc15", color: "#1a1a1a", fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 10 }}>
             🧾 {lang === "fr" ? "Mode comptoir" : "柜台模式"}
+            {comptoirExpire && <button onClick={() => setConnexionComptoir(true)} data-nr="reconnecter" style={{ marginLeft: 8, border: "none", background: "#b45309", color: "white", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+              {lang === "fr" ? "session expirée — se reconnecter" : "登录已过期 — 重新登录"}
+            </button>}
           </div>
         )}
       </div>
@@ -2231,7 +2259,8 @@ function OrderPage() {
               onChange={e => { setMdpComptoir(e.target.value); setMdpComptoirErreur(false); }}
               onKeyDown={e => e.key === "Enter" && validerComptoir()}
               style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: `1.5px solid ${mdpComptoirErreur ? "#dc2626" : "#ddd"}`, fontSize: 16, marginBottom: 8 }} />
-            {mdpComptoirErreur && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{lang === "fr" ? "Mot de passe incorrect" : "密码错误"}</div>}
+            {comptoirExpire && <div data-nr="session-expiree" style={{ color: "#b45309", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{lang === "fr" ? "Session expirée — reconnectez-vous pour commander en mode comptoir" : "登录已过期,请重新登录后再以柜台模式下单"}</div>}
+            {mdpComptoirErreur && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{mdpComptoirErreur}</div>}
             <button onClick={validerComptoir} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
               {lang === "fr" ? "Entrer" : "进入"}
             </button>
@@ -2451,7 +2480,15 @@ ${item.options ? `<div class="opt">${Object.values(item.options).map(v => typeof
 }
 
 function KitchenPanel() {
-  const [authed, setAuthed] = useState(() => localStorage.getItem("nr_kitchen") === "1");
+  const [authed, setAuthed] = useState(sessionValide);
+  const [sessionExpiree, setSessionExpiree] = useState(false);
+  useEffect(() => {
+    // Jeton refuse par le serveur, ou arrive a expiration : l'ecran revient a la connexion, avec la raison.
+    const expire = () => { setAuthed(false); setSessionExpiree(true); };
+    window.addEventListener(EVT_SESSION_EXPIREE, expire);
+    const t = setInterval(() => { if (!sessionValide()) expire(); }, 30000);
+    return () => { window.removeEventListener(EVT_SESSION_EXPIREE, expire); clearInterval(t); };
+  }, []);
   const [pwd, setPwd] = useState("");
   const [pwdErr, setPwdErr] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -2496,7 +2533,7 @@ function KitchenPanel() {
     if (!authed) return;
     const poll = async () => {
       try {
-        const res = await fetch(`${API}/api/order/queue?namespace=${NS}`);
+        const res = await fetchPersonnel(`${API}/api/order/queue?namespace=${NS}`);
         const data = await res.json();
         const newOrders = data.orders || [];
 
@@ -2536,7 +2573,7 @@ function KitchenPanel() {
         for (const order of newOrders) {
           if (order.status === "ready" && order.updated_at) {
             if (now - new Date(order.updated_at) > 5 * 60 * 1000) {
-              fetch(`${API}/api/order/${order.id}/picked`, {
+              fetchPersonnel(`${API}/api/order/${order.id}/picked`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ namespace: NS }),
               }).catch(() => {});
@@ -2561,7 +2598,7 @@ function KitchenPanel() {
   }, [authed]);
 
   const markReady = async (id) => {
-    await fetch(`${API}/api/order/${id}/complete`, {
+    await fetchPersonnel(`${API}/api/order/${id}/complete`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS }),
     });
@@ -2570,7 +2607,7 @@ function KitchenPanel() {
   };
 
   const confirmPayment = async (id, paymentMethod) => {
-    await fetch(`${API}/api/order/${id}/confirm-payment`, {
+    await fetchPersonnel(`${API}/api/order/${id}/confirm-payment`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS, payment_method: paymentMethod }),
     });
@@ -2578,7 +2615,7 @@ function KitchenPanel() {
   };
 
   const markPicked = async (id) => {
-    await fetch(`${API}/api/order/${id}/picked`, {
+    await fetchPersonnel(`${API}/api/order/${id}/picked`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS }),
     });
@@ -2589,7 +2626,7 @@ function KitchenPanel() {
     const timeStr = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     printedIdsRef.current.add(id);
     setPrintedMap(prev => ({ ...prev, [id]: timeStr }));
-    fetch(`${API}/api/order/${id}/mark-printed`, {
+    fetchPersonnel(`${API}/api/order/${id}/mark-printed`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS }),
     }).catch(() => {});
@@ -2609,9 +2646,9 @@ function KitchenPanel() {
     setTicketOrder(order);
   };
 
-  const handleLogin = () => {
-    if (pwd === MOT_DE_PASSE_PERSONNEL) { localStorage.setItem("nr_kitchen", "1"); setAuthed(true); setPwdErr(false); }
-    else setPwdErr(true);
+  const handleLogin = async () => {
+    const r = await connecterPersonnel(pwd);
+    if (r.ok) { setAuthed(true); setPwdErr(false); setSessionExpiree(false); setPwd(""); } else setPwdErr(messageErreurConnexion(r.erreur));
   };
 
   if (!authed) {
@@ -2621,11 +2658,14 @@ function KitchenPanel() {
         <div style={{ background: "#2a2a2a", borderRadius: 16, padding: 32, width: 320, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>👨‍🍳</div>
           <h2 style={{ color: "#8B0000", fontSize: 22, marginBottom: 20 }}>Cuisine · 后厨</h2>
+          {sessionExpiree && <div data-nr="session-expiree" style={{ color: "#fbbf24", fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+            Session expirée — reconnectez-vous · 登录已过期,请重新登录
+          </div>}
           <input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdErr(false); }}
             onKeyDown={e => e.key === "Enter" && handleLogin()}
             placeholder="Mot de passe"
             style={{ width: "100%", padding: 14, borderRadius: 10, border: pwdErr ? "2px solid #dc2626" : "1px solid #444", background: "#333", color: "white", fontSize: 16, boxSizing: "border-box", marginBottom: 12, outline: "none" }} />
-          {pwdErr && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>Mot de passe incorrect</div>}
+          {pwdErr && <div data-nr="erreur-connexion" style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{pwdErr === true ? "Mot de passe incorrect" : pwdErr}</div>}
           <button onClick={handleLogin} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Entrer</button>
         </div>
       </div>
@@ -3461,6 +3501,7 @@ function PaymentMethodPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          suivi_token: sessionStorage.getItem("nr_pending_suivi_token") || "",
           namespace: NS,
           order_id: orderId,
           amount,
@@ -3707,7 +3748,7 @@ function WaitingForPaymentPage() {
     if (!orderId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${API}/api/order/${orderId}/status?namespace=${NS}`);
+        const res = await fetch(`${API}/api/order/${orderId}/status?namespace=${NS}&t=${encodeURIComponent(sessionStorage.getItem("nr_pending_suivi_token") || "")}`);
         const data = await res.json();
         // Accept either "status" or "payment_status" field from backend
         const orderStatus = data.status || data.payment_status;
