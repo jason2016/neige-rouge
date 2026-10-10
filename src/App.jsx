@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import InstallPrompt from "./components/InstallPrompt";
+import { SuiviPage, ComptoirPage, EcranPrets, ReglagePosteComptoir } from "./components/Suivi";
+import { estPosteComptoir } from "./components/posteComptoir";
 
 const SPICE_CHOICES = [
   { value: "no_spicy", fr: "Non piquant", zh: "不辣" },
@@ -1464,6 +1466,7 @@ function AdminPanel() {
         <h1 style={{ color: "white", fontSize: 18, fontWeight: 700, margin: 0 }}>🔧 {A.title}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setLang(lang === "fr" ? "zh" : "fr")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.switchLang}</button>
+          <ReglagePosteComptoir />
           <button onClick={() => { localStorage.removeItem("nr_admin"); localStorage.removeItem("nr_admin_key"); setAuthed(false); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "5px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{A.logout}</button>
         </div>
       </div>
@@ -2086,6 +2089,8 @@ function OrderPage() {
           })),
           order_type: orderType,
           total_amount: total,
+          // client = telephone du client ; staff = poste du comptoir (reglage dans Gestion)
+          order_source: estPosteComptoir() ? "staff" : "client",
         }),
       });
       const orderData = await orderRes.json();
@@ -2107,7 +2112,15 @@ function OrderPage() {
         name: i.name, qty: i.qty, price: i.price, options: i.options,
       }))));
       sessionStorage.setItem("nr_pending_lang", lang);
-      window.location.hash = `pending-counter?order_id=${orderData.order_id}&amount=${total.toFixed(2)}`;
+      if (orderData.suivi_token) {
+        // Le jeton (aleatoire) est la seule cle de la page de suivi ; jamais l'id ni le numero.
+        window.location.hash = estPosteComptoir()
+          ? `comptoir?t=${encodeURIComponent(orderData.suivi_token)}`
+          : `suivi?t=${encodeURIComponent(orderData.suivi_token)}`;
+      } else {
+        // Backend sans suivi (ancienne version) : l'ecran d'avant, inchange.
+        window.location.hash = `pending-counter?order_id=${orderData.order_id}&amount=${total.toFixed(2)}`;
+      }
     } catch {
       setSubmitError(lang === "fr" ? "Erreur de connexion" : "网络错误");
     } finally {
@@ -3849,10 +3862,11 @@ export default function App() {
   }, []);
 
   const { path: route, params } = routeInfo;
-  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success", "payment-method", "payment-waiting", "order-success", "pending-counter"];
+  const hiddenRoutes = ["order", "menu", "payment-success", "booking-success", "payment-method", "payment-waiting", "order-success", "pending-counter", "suivi", "comptoir"];
   // Kitchen and admin don't need install prompt
   if (route === "admin") return <AdminPanel />;
   if (route === "kitchen") return <KitchenPanel />;
+  if (route === "ready") return <EcranPrets />;
   if (route === "workstation" && F.workStation) return <WorkStationPanel />;
   return (
     <>
@@ -3864,6 +3878,8 @@ export default function App() {
       {route === "payment-waiting" && <WaitingForPaymentPage />}
       {route === "order-success" && <OrderSuccessPage />}
       {route === "pending-counter" && <PendingCounterPayment />}
+      {route === "suivi" && <SuiviPage />}
+      {route === "comptoir" && <ComptoirPage />}
       {!hiddenRoutes.includes(route) && <LandingPage />}
       <InstallPrompt />
     </>
