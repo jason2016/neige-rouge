@@ -366,6 +366,9 @@ const FEATURES_CONFIG = {
     workStation: false,
   },
 };
+// Espace de recette (jason2016.github.io/neige-rouge/recette/) : memes reglages que Neige Rouge,
+// pour tester exactement le meme comportement avec des commandes fictives.
+FEATURES_CONFIG["neige-rouge-recette"] = FEATURES_CONFIG["neige-rouge"];
 const F = FEATURES_CONFIG[NS] ?? {};
 
 const LOGO_URL = "https://focusingpro.s3.amazonaws.com/FutuShow/system/images/sYtqj14lsLGv.png";
@@ -2102,7 +2105,9 @@ function OrderPage() {
       await fetch(`${API}/api/neige-rouge/orders/${orderData.order_id}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_method: "card_counter" }),
+        // namespace explicite : sans lui le serveur suppose « neige-rouge » (backlog
+        // 2026-10-08-restaurant-checkout-namespace) et la commande d'un autre espace resterait non vue.
+        body: JSON.stringify({ namespace: NS, payment_method: "card_counter" }),
       }).catch(() => {}); // non-fatal: customer still goes to counter screen
       // Persist order data for payment pages
       sessionStorage.setItem("nr_pending_order_id", orderData.order_id);
@@ -3887,3 +3892,5 @@ export default function App() {
 }
 
 export { KitchenPanel, AdminPanel };
+// Ré-export : les trois points d'entrée l'importent d'ici, le bloc partagé garde le nom « App ».
+export { default as BandeauRecette } from "./components/BandeauRecette";

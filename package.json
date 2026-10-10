@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "build:recette": "vite build --mode recette --base /neige-rouge/recette/ --outDir dist-recette --emptyOutDir && node scripts/post-recette.mjs",
+    "deploy:recette": "npm run build:recette && gh-pages -d dist-recette -e recette --add"
   },
   "dependencies": {
     "qrcode": "^1.5.4",

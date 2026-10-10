@@ -8,7 +8,7 @@
 // devinent : ils n'ouvrent aucune page ici.
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { estPosteComptoir } from "./posteComptoir";
+import { estPosteComptoir, CLE_POSTE_COMPTOIR } from "./posteComptoir";
 
 const API = import.meta.env.VITE_API_BASE || "https://mcp.clawshow.ai";
 const NS = import.meta.env.VITE_NAMESPACE || "neige-rouge";
@@ -174,7 +174,8 @@ function BoutonPush({ jeton, L }) {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(cle.current) });
       // Le service worker reçoit un push vide et vient demander le numéro : il lui faut l'adresse de l'API.
-      try { await (await caches.open("nr-config")).put("/neige-rouge/__api", new Response(API)); } catch { /* sans cache : avis générique */ }
+      // Clé = base de l'espace : la recette et la production ont chacune la leur dans le cache partagé.
+      try { await (await caches.open("nr-config")).put(`${import.meta.env.BASE_URL}__api`, new Response(API)); } catch { /* sans cache : avis générique */ }
       const r = await fetch(`${API}/api/suivi/${encodeURIComponent(jeton)}/push`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: sub.toJSON() }),
       });
@@ -394,7 +395,7 @@ export function ReglagePosteComptoir() {
   const [actif, setActif] = useState(estPosteComptoir);
   const basculer = () => {
     try {
-      if (actif) localStorage.removeItem("nr_poste_comptoir"); else localStorage.setItem("nr_poste_comptoir", "1");
+      if (actif) localStorage.removeItem(CLE_POSTE_COMPTOIR); else localStorage.setItem(CLE_POSTE_COMPTOIR, "1");
       setActif(!actif);
     } catch { /* stockage indisponible */ }
   };
