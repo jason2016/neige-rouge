@@ -9,3 +9,13 @@ export const CLE_POSTE_COMPTOIR = NS === "neige-rouge" ? "nr_poste_comptoir" : `
 export const estPosteComptoir = () => {
   try { return localStorage.getItem(CLE_POSTE_COMPTOIR) === "1"; } catch { return false; }
 };
+export const activerPosteComptoir = () => {
+  try { localStorage.setItem(CLE_POSTE_COMPTOIR, "1"); return true; } catch { return false; }
+};
+// Meme verification que l'ecran cuisine (meme mot de passe, verifie dans le navigateur) : c'est la
+// porte « staff » existante, avec sa faiblesse connue (backlog 2026-10-08-neige-rouge-auth-ecrans).
+// Une seule source pour les deux ecrans : quand l'authentification passera au serveur, ce sera ici.
+export const MOT_DE_PASSE_PERSONNEL = "kitchen2025";
+// « #order?comptoir=1 » : un appareil du personnel demande le mode comptoir (aucune nouvelle route).
+export const demandeModeComptoir = () =>
+  new URLSearchParams(window.location.hash.split("?")[1] || "").get("comptoir") === "1";

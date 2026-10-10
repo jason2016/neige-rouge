@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import InstallPrompt from "./components/InstallPrompt";
 import { SuiviPage, ComptoirPage, EcranPrets, ReglagePosteComptoir } from "./components/Suivi";
-import { estPosteComptoir } from "./components/posteComptoir";
+import { estPosteComptoir, activerPosteComptoir, demandeModeComptoir, MOT_DE_PASSE_PERSONNEL } from "./components/posteComptoir";
 
 const SPICE_CHOICES = [
   { value: "no_spicy", fr: "Non piquant", zh: "不辣" },
@@ -1986,6 +1986,18 @@ function LandingPage() {
 
 function OrderPage() {
   const [lang, setLang] = useState("fr");
+  // Mode comptoir : appareil du personnel. #order?comptoir=1 demande une connexion (même mot de passe
+  // que la cuisine) ; une fois connecté, l'appareil le garde (localStorage) pour #order tout court,
+  // jusqu'à « Poste comptoir : OFF » dans Gestion. Sans connexion : client ordinaire.
+  const [modeComptoir, setModeComptoir] = useState(estPosteComptoir);
+  const [connexionComptoir, setConnexionComptoir] = useState(() => demandeModeComptoir() && !estPosteComptoir());
+  const [mdpComptoir, setMdpComptoir] = useState("");
+  const [mdpComptoirErreur, setMdpComptoirErreur] = useState(false);
+  const validerComptoir = () => {
+    if (mdpComptoir === MOT_DE_PASSE_PERSONNEL && activerPosteComptoir()) {
+      setModeComptoir(true); setConnexionComptoir(false); setMdpComptoirErreur(false);
+    } else setMdpComptoirErreur(true);
+  };
   const [cart, setCart] = useState({});               // non-bento, no-option items: { [id]: qty }
   const [menuSelections, setMenuSelections] = useState([]); // bento: [{uid, menuId, options}]
   const [optionSelections, setOptionSelections] = useState([]); // items with options: [{uid, itemId, selections}]
@@ -2151,6 +2163,11 @@ function OrderPage() {
           fontFamily: lang === "zh" ? "'Noto Serif SC', serif" : "'Playfair Display', serif",
           fontSize: 22, fontWeight: 900, color: "white", margin: 0,
         }}>{lang === "fr" ? "Commander" : "点餐"}</h1>
+        {modeComptoir && (
+          <div data-nr="badge-comptoir" style={{ display: "inline-block", marginTop: 6, background: "#facc15", color: "#1a1a1a", fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 10 }}>
+            🧾 {lang === "fr" ? "Mode comptoir" : "柜台模式"}
+          </div>
+        )}
       </div>
 
       {/* Menu */}
@@ -2201,6 +2218,29 @@ function OrderPage() {
             qty={optionCount(item.id)} onAdd={() => setOptionsItem(item)} onRemove={removeLastOptionItem} soldOut={stock[item.id]?.sold_out} />)}
         </Section>
       </div>
+
+      {/* Connexion du mode comptoir (#order?comptoir=1) */}
+      {connexionComptoir && (
+        <div data-nr="connexion-comptoir" style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 340 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🧾 {lang === "fr" ? "Mode comptoir" : "柜台模式"}</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 14 }}>
+              {lang === "fr" ? "Réservé au personnel · mot de passe de la cuisine" : "仅限员工 · 输入后厨密码"}
+            </div>
+            <input type="password" value={mdpComptoir} autoFocus data-nr="mdp-comptoir"
+              onChange={e => { setMdpComptoir(e.target.value); setMdpComptoirErreur(false); }}
+              onKeyDown={e => e.key === "Enter" && validerComptoir()}
+              style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: `1.5px solid ${mdpComptoirErreur ? "#dc2626" : "#ddd"}`, fontSize: 16, marginBottom: 8 }} />
+            {mdpComptoirErreur && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>{lang === "fr" ? "Mot de passe incorrect" : "密码错误"}</div>}
+            <button onClick={validerComptoir} style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: "#8B0000", color: "white", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+              {lang === "fr" ? "Entrer" : "进入"}
+            </button>
+            <button onClick={() => setConnexionComptoir(false)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #ddd", background: "white", color: "#555", fontSize: 14, fontWeight: 600 }}>
+              {lang === "fr" ? "Continuer comme client" : "以顾客身份继续"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Customizer modal */}
       {customizerItem && (
@@ -2570,7 +2610,7 @@ function KitchenPanel() {
   };
 
   const handleLogin = () => {
-    if (pwd === "kitchen2025") { localStorage.setItem("nr_kitchen", "1"); setAuthed(true); setPwdErr(false); }
+    if (pwd === MOT_DE_PASSE_PERSONNEL) { localStorage.setItem("nr_kitchen", "1"); setAuthed(true); setPwdErr(false); }
     else setPwdErr(true);
   };
 
@@ -2654,11 +2694,12 @@ function KitchenPanel() {
           const otColor = ot.color;
           const otLabel = ot.known ? `${ot.icon} ${ot.up} · ${ot.zh}` : "❓ ?";
           const priceColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "white";
-          const statusLabel = isReady ? "🔔 PRÊT" : isUnpaid ? "⚠ Non payé" : "✓ Payé";
+          // L'ETIQUETTE dit l'etat ; le BOUTON dit ce que le clic va faire (jamais l'etat courant).
+          const statusLabel = isReady ? "🔔 PRÊT · 已做好" : isUnpaid ? "⚠ Non payé · 未付款" : "✓ Payé · en préparation · 制作中";
           const statusColor = isReady ? "white" : isUnpaid ? "#f59e0b" : "#22c55e";
           const btnBg = isReady ? "white" : isUnpaid ? "#f59e0b" : "#22c55e";
           const btnColor = isReady ? "#ef4444" : isUnpaid ? "#1a1a1a" : "white";
-          const btnLabel = isReady ? "🔔 Terminé" : isUnpaid ? "💳 Encaisser" : "⏱ En cours";
+          const btnLabel = isReady ? "🤝 Remis au client · 已取餐" : isUnpaid ? "💳 Encaisser · 收款" : "✅ Prêt · 做好了";
 
           const isNew = order.created_at && (Date.now() - new Date(order.created_at).getTime()) < 30000;
 
@@ -2750,11 +2791,24 @@ function KitchenPanel() {
                   );
                 })}
               </div>
-              <button onClick={handleAction} style={{
+              <button onClick={handleAction} data-nr="action-cuisine" style={{
                 width: "100%", padding: "12px 0", border: "none", borderRadius: "6px",
                 fontSize: "17px", fontWeight: 700, cursor: "pointer",
                 background: btnBg, color: btnColor,
               }}>{btnLabel}</button>
+              {isUnpaid && (
+                /* Regle actuelle (inchangee, en attente du restaurant) : encaisser AVANT de pouvoir marquer
+                   Pret. Le bouton est montre mais inactif, et la raison est ecrite juste dessous. */
+                <>
+                  <button disabled data-nr="pret-bloque" style={{
+                    width: "100%", padding: "10px 0", marginTop: 6, border: "1.5px dashed #6b7280", borderRadius: "6px",
+                    fontSize: "15px", fontWeight: 700, background: "transparent", color: "#6b7280", cursor: "not-allowed",
+                  }}>✅ Prêt · 做好了</button>
+                  <div data-nr="raison-pret" style={{ fontSize: "13px", color: "#f59e0b", marginTop: 4, textAlign: "center" }}>
+                    Encaisser d'abord pour pouvoir marquer Prêt · 先收款才能标记做好
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
