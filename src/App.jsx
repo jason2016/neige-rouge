@@ -1959,9 +1959,9 @@ function LandingPage() {
           color: "white", textAlign: "center", textDecoration: "none",
           fontSize: 20, fontWeight: 700, boxSizing: "border-box",
         }}>
-          {lang === "fr" ? "Commander sur place" : "到店点餐"}
+          {lang === "fr" ? "Commander" : "点单"}
           <div style={{ fontSize: 13, fontWeight: 400, opacity: 0.8, marginTop: 6 }}>
-            {lang === "fr" ? "Scannez, commandez, dégustez" : "扫码点餐，即刻享用"}
+            {lang === "fr" ? "Sur place ou à emporter" : "堂食或打包"}
           </div>
         </a>
       </div>
