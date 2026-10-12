@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { estPosteComptoir, CLE_POSTE_COMPTOIR } from "./posteComptoir";
+import { bloquerMiseAJour } from "./miseAJour";
 
 const API = import.meta.env.VITE_API_BASE || "https://mcp.clawshow.ai";
 const NS = import.meta.env.VITE_NAMESPACE || "neige-rouge";
@@ -17,6 +18,7 @@ const NS = import.meta.env.VITE_NAMESPACE || "neige-rouge";
 // Le retour au premier plan (visibilitychange) déclenche en plus une lecture immédiate.
 const INTERVALLE_SUIVI_MS = 10000;
 const INTERVALLE_ECRAN_MS = 5000;
+const CLE_ECRAN_DEMARRE = "nr_ecran_appel_demarre";
 
 
 const params = () => new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf("?") + 1));
@@ -235,6 +237,10 @@ export function SuiviPage() {
   if (etat === "pret" && !aEtePrete) setAEtePrete(true);   // ajustement pendant le rendu (motif React documenté)
   const alerte = (etat === "pret" || (etat === "retire" && aEtePrete)) && !acquitte;
   const ecranTenu = useVerrouEcran(etat === "en_preparation" || alerte);
+  // Pas de rechargement automatique pendant l'attente ni pendant l'alerte : il ferait perdre le son
+  // debloque, l'ecran maintenu allume et l'alerte en cours. Apres la remise, la page peut se recharger.
+  const attente = etat === "en_preparation" || alerte;
+  useEffect(() => (attente ? bloquerMiseAJour("suivi") : undefined), [attente]);
 
   useEffect(() => {
     if (etat === "pret" && !dejaSonne.current) { dejaSonne.current = true; vibrer(); bip(3); }
@@ -330,7 +336,23 @@ export function ComptoirPage() {
 }
 
 export function EcranPrets() {
-  const [demarre, setDemarre] = useState(false);
+  // Demarre une fois, reste demarre apres un rechargement (automatique a chaque deploiement) :
+  // sinon l'ecran d'appel retomberait sur « Touchez pour démarrer » et n'afficherait plus rien.
+  const [demarre, setDemarreEtat] = useState(() => { try { return sessionStorage.getItem(CLE_ECRAN_DEMARRE) === "1"; } catch { return false; } });
+  const setDemarre = (v) => { try { sessionStorage.setItem(CLE_ECRAN_DEMARRE, v ? "1" : ""); } catch { /* ignore */ } setDemarreEtat(v); };
+  // Apres un rechargement sans geste, le son peut etre bloque par le navigateur : on le dit.
+  const [sonBloque, setSonBloque] = useState(false);
+  useEffect(() => {
+    if (!demarre) return;
+    try {
+      if (!_audio) _audio = new (window.AudioContext || window.webkitAudioContext)();
+    } catch { /* pas d'audio */ }
+    const relire = () => setSonBloque(!!_audio && _audio.state !== "running");
+    const premiere = setTimeout(relire, 0);
+    const toucher = () => { debloquerSon(); setTimeout(relire, 300); };
+    window.addEventListener("pointerdown", toucher);
+    return () => { clearTimeout(premiere); window.removeEventListener("pointerdown", toucher); };
+  }, [demarre]);
   const [numeros, setNumeros] = useState([]);
   const [neufs, setNeufs] = useState({});      // numero -> instant d'apparition
   const precedent = useRef(null);
@@ -378,6 +400,9 @@ export function EcranPrets() {
     <div style={{ ...base, background: "#111", color: "white", padding: "16px 20px" }}>
       <style>{CSS}</style>
       <div style={{ fontSize: 30, fontWeight: 900, textAlign: "center", marginBottom: 16, color: "#4ade80" }}>PRÊT · 请取餐</div>
+      {sonBloque && <div data-nr="son-bloque" style={{ background: "#ca8a04", color: "#1a1a1a", borderRadius: 10, padding: "8px 12px", fontSize: 16, fontWeight: 800, textAlign: "center", marginBottom: 12 }}>
+        🔊 Touchez l'écran pour activer le son · 点击屏幕开启提示音
+      </div>}
       <div data-nr="liste" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
         {numeros.map(n => (
           <div key={n} data-nr="numero" data-neuf={neufs[n] ? "1" : "0"} className={neufs[n] ? "nr-pret-flash" : "nr-pret-fixe"}

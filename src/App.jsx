@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import InstallPrompt from "./components/InstallPrompt";
+import { bloquerMiseAJour, operation } from "./components/miseAJour";
 import { SuiviPage, ComptoirPage, EcranPrets, ReglagePosteComptoir } from "./components/Suivi";
 import { estPosteComptoir, activerPosteComptoir, demandeModeComptoir } from "./components/posteComptoir";
 import { sessionValide, connecterPersonnel, deconnecterPersonnel, fetchPersonnel, EVT_SESSION_EXPIREE, messageErreurConnexion } from "./components/sessionPersonnel";
@@ -608,11 +609,13 @@ function CommandesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namespace: NS, payment_method: order.payment_method || "card_counter", amount_received: amount }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         setOrders(prev => prev.map(o => o.id === order.id ? { ...o, payment_status: "paid" } : o));
+      } else {
+        alert(`Paiement non confirmé (${data.error || "HTTP " + res.status}). Rafraîchissez la page puis réessayez.`);
       }
-    } catch {}
+    } catch { alert("Erreur de connexion — paiement non confirmé. Rafraîchissez la page puis réessayez."); }
     setConfirming(p => ({ ...p, [order.id]: false }));
   };
 
@@ -1353,6 +1356,9 @@ function WorkStationPanel() {
 }
 
 function AdminPanel() {
+  // Gestion : pas de rechargement automatique (des saisies — stock, factures — peuvent etre en cours
+  // sans avoir le focus). Un bandeau « Nouvelle version · Rafraîchir » s'affiche a la place.
+  useEffect(() => bloquerMiseAJour("gestion"), []);
   const [lang, setLang] = useState("fr");
   const [tab, setTab] = useState("commandes");
   const [authed, setAuthed] = useState(() => localStorage.getItem("nr_admin") === "1" && !!localStorage.getItem("nr_admin_key"));
@@ -2097,6 +2103,16 @@ function OrderPage() {
   const total = allCartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = allCartItems.reduce((s, i) => s + i.qty, 0);
 
+  // Mise a jour automatique : jamais tant qu'il y a un panier ou une commande en cours d'envoi.
+  // Le rechargement a lieu apres la commande (la page de suivi n'a plus de panier a perdre).
+  const panierActif = allCartItems.length > 0 || submitting;
+  useEffect(() => (panierActif ? bloquerMiseAJour("panier") : undefined), [panierActif]);
+
+  // Commande creee mais pas transmise a la cuisine (checkout en echec) : un nouvel essai reprend
+  // CETTE commande au lieu d'en creer une deuxieme. Valable tant que le panier n'a pas change.
+  const commandeEnAttente = useRef(null);
+  const clePanier = JSON.stringify([orderType, allCartItems.map(i => [i.id, i.qty, i.options || null])]);
+
   const handleSubmit = async () => {
     if (allCartItems.length === 0) return;
     if (estPosteComptoir() && !sessionValide()) {
@@ -2113,8 +2129,10 @@ function OrderPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
+      const reprise = commandeEnAttente.current && commandeEnAttente.current.cle === clePanier
+        ? commandeEnAttente.current.data : null;
       // Create order — payment method chosen on next page
-      const orderRes = await (estPosteComptoir() ? fetchPersonnel : fetch)(`${API}/api/order/create`, {
+      const orderRes = reprise ? { json: async () => reprise } : await (estPosteComptoir() ? fetchPersonnel : fetch)(`${API}/api/order/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2137,14 +2155,25 @@ function OrderPage() {
         setSubmitError(orderData.error || "Erreur création commande");
         return;
       }
-      // Set payment_status=pending_counter so kitchen sees the order
-      await fetch(`${API}/api/neige-rouge/orders/${orderData.order_id}/checkout`, {
+      commandeEnAttente.current = { cle: clePanier, data: orderData };
+      // payment_status=pending_counter : c'est ce qui rend la commande visible en cuisine.
+      // 🔴 Plus jamais d'echec silencieux (2026-10-12) : un 401 ici laissait la commande « unpaid »,
+      // invisible en cuisine, pendant que la page affichait « payez au comptoir ».
+      const ckRes = await fetch(`${API}/api/neige-rouge/orders/${orderData.order_id}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // namespace explicite : sans lui le serveur suppose « neige-rouge » (backlog
         // 2026-10-08-restaurant-checkout-namespace) et la commande d'un autre espace resterait non vue.
         body: JSON.stringify({ namespace: NS, payment_method: "card_counter", suivi_token: orderData.suivi_token }),
-      }).catch(() => {}); // non-fatal: customer still goes to counter screen
+      });
+      const ckData = await ckRes.json().catch(() => ({}));
+      if (!ckRes.ok || !ckData.success) {
+        setSubmitError(lang === "zh"
+          ? `订单 ${orderData.order_number} 未能送达厨房。请再点一次「下单」;若仍失败,请刷新页面并到柜台出示此号码。`
+          : `La commande ${orderData.order_number} n'a pas pu être transmise à la cuisine. Appuyez de nouveau sur « Commander » ; si cela échoue encore, rafraîchissez la page et montrez ce numéro au comptoir.`);
+        return;
+      }
+      commandeEnAttente.current = null;
       // Persist order data for payment pages
       sessionStorage.setItem("nr_pending_order_id", orderData.order_id);
       sessionStorage.setItem("nr_pending_order_number", orderData.order_number);
@@ -2500,6 +2529,48 @@ function KitchenPanel() {
   const printedIdsRef = useRef(new Set());
   const isFirstPollRef = useRef(true);
   const audioCtxRef = useRef(null);
+  // 🔴 Jamais d'echec silencieux (2026-10-12) : une action refusee ou une liste qui ne se met plus a
+  // jour s'affiche en haut de l'ecran, avec la consigne de rafraichir.
+  const [erreurAction, setErreurAction] = useState("");
+  const [lectureEnEchec, setLectureEnEchec] = useState(false);
+  // Le son exige un geste. Apres un rechargement (automatique ou non) sans geste, le navigateur peut
+  // laisser l'audio suspendu : les bips des nouvelles commandes seraient muets sans que personne le
+  // sache. On le dit, et le premier toucher le retablit.
+  const [sonBloque, setSonBloque] = useState(false);
+  useEffect(() => {
+    if (!authed) return;
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtxRef.current.state !== "running") setSonBloque(true);
+    } catch { /* pas d'audio sur cet appareil */ }
+    const debloquer = () => {
+      const c = audioCtxRef.current;
+      if (!c) return;
+      if (c.state === "running") { setSonBloque(false); return; }
+      c.resume().then(() => setSonBloque(c.state !== "running")).catch(() => setSonBloque(true));
+    };
+    window.addEventListener("pointerdown", debloquer);
+    return () => window.removeEventListener("pointerdown", debloquer);
+  }, [authed]);
+  // Pas de rechargement automatique pendant qu'un ticket est ouvert.
+  useEffect(() => (ticketOrder ? bloquerMiseAJour("ticket") : undefined), [ticketOrder]);
+
+  // Une action de cuisine : bloque la mise a jour pendant la requete, et n'applique le changement
+  // a l'ecran QUE si le serveur l'a accepte. 401 : la session expire, l'ecran de connexion le dit.
+  const actionCuisine = (libelle, url, opts, apresSucces) => operation(async () => {
+    try {
+      const r = await fetchPersonnel(url, opts);
+      if (r.status === 401) return;
+      if (!r.ok) {
+        setErreurAction(`${libelle} : refusé (HTTP ${r.status}). Rafraîchissez la page puis réessayez · 操作失败,请刷新页面后重试`);
+        return;
+      }
+      setErreurAction("");
+      apresSucces();
+    } catch {
+      setErreurAction(`${libelle} : connexion perdue. Rafraîchissez la page puis réessayez · 网络中断,请刷新页面后重试`);
+    }
+  });
 
   const playSound = (freq = 880, duration = 0.3) => {
     try {
@@ -2534,7 +2605,10 @@ function KitchenPanel() {
     const poll = async () => {
       try {
         const res = await fetchPersonnel(`${API}/api/order/queue?namespace=${NS}`);
+        if (res.status === 401) return;   // l'ecran de connexion prend le relais, avec la raison
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        setLectureEnEchec(false);
         const newOrders = data.orders || [];
 
         // Detect new pending orders → auto-show ticket modal
@@ -2576,7 +2650,9 @@ function KitchenPanel() {
               fetchPersonnel(`${API}/api/order/${order.id}/picked`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ namespace: NS }),
-              }).catch(() => {});
+              }).then(r => {
+                if (!r.ok && r.status !== 401) setErreurAction(`Remise automatique de la commande ${order.order_number} refusée (HTTP ${r.status}) — rafraîchissez la page`);
+              }).catch(() => setErreurAction("Connexion perdue — rafraîchissez la page · 网络中断,请刷新页面"));
             }
           }
         }
@@ -2590,37 +2666,34 @@ function KitchenPanel() {
           }
           return o.payment_status === "paid" || o.payment_status === "pending_counter" || o.payment_status === "pending_cash" || o.payment_status === "pending_terminal" || o.payment_status === "unpaid_order_started" || o.payment_status === "pending_sumup";
         }));
-      } catch {}
+      } catch {
+        // Le 2026-10-12, un ecran a demande la liste 706 fois en 35 min sans jamais l'obtenir, et
+        // n'affichait rien de different d'une cuisine sans commande.
+        setLectureEnEchec(true);
+      }
     };
     poll();
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, [authed]);
 
-  const markReady = async (id) => {
-    await fetchPersonnel(`${API}/api/order/${id}/complete`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ namespace: NS }),
-    });
+  const markReady = (id) => actionCuisine("Prêt", `${API}/api/order/${id}/complete`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ namespace: NS }),
+  }, () => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: "ready", updated_at: new Date().toISOString() } : o));
     playReadySound();
-  };
+  });
 
-  const confirmPayment = async (id, paymentMethod) => {
-    await fetchPersonnel(`${API}/api/order/${id}/confirm-payment`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ namespace: NS, payment_method: paymentMethod }),
-    });
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: "paid" } : o));
-  };
+  const confirmPayment = (id, paymentMethod) => actionCuisine("Encaisser", `${API}/api/order/${id}/confirm-payment`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ namespace: NS, payment_method: paymentMethod }),
+  }, () => setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: "paid" } : o)));
 
-  const markPicked = async (id) => {
-    await fetchPersonnel(`${API}/api/order/${id}/picked`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ namespace: NS }),
-    });
-    setOrders(prev => prev.filter(o => o.id !== id));
-  };
+  const markPicked = (id) => actionCuisine("Remis au client", `${API}/api/order/${id}/picked`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ namespace: NS }),
+  }, () => setOrders(prev => prev.filter(o => o.id !== id)));
 
   const markPrinted = async (id) => {
     const timeStr = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -2629,7 +2702,9 @@ function KitchenPanel() {
     fetchPersonnel(`${API}/api/order/${id}/mark-printed`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ namespace: NS }),
-    }).catch(() => {});
+    }).then(r => {
+      if (!r.ok && r.status !== 401) setErreurAction(`Ticket ${id} non enregistré (HTTP ${r.status}) — rafraîchissez la page`);
+    }).catch(() => setErreurAction("Connexion perdue — rafraîchissez la page · 网络中断,请刷新页面"));
   };
 
   const handlePrintAndClose = () => {
@@ -2713,6 +2788,25 @@ function KitchenPanel() {
         </div>
         <span style={{ fontSize: 22, color: "#888", fontFamily: "'JetBrains Mono', monospace" }}>{clock}</span>
       </div>
+
+      {sonBloque && (
+        <div data-nr="son-bloque" style={{ background: "#ca8a04", color: "#1a1a1a", padding: "10px 16px", fontSize: 18, fontWeight: 800, textAlign: "center", flexShrink: 0 }}>
+          🔊 Touchez l'écran pour activer le son · 点击屏幕开启提示音
+        </div>
+      )}
+      {lectureEnEchec && (
+        <div data-nr="lecture-echec" style={{ background: "#c2410c", color: "white", padding: "10px 16px", fontSize: 17, fontWeight: 700, display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          ⚠ Liste des commandes non mise à jour · 订单列表未更新
+          <button onClick={() => window.location.reload()} style={{ background: "white", color: "#c2410c", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 800, cursor: "pointer" }}>Rafraîchir · 刷新</button>
+        </div>
+      )}
+      {erreurAction && (
+        <div data-nr="erreur-action" style={{ background: "#dc2626", color: "white", padding: "10px 16px", fontSize: 17, fontWeight: 700, display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          ⚠ {erreurAction}
+          <button onClick={() => window.location.reload()} style={{ background: "white", color: "#dc2626", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 800, cursor: "pointer" }}>Rafraîchir · 刷新</button>
+          <button onClick={() => setErreurAction("")} aria-label="Fermer" style={{ background: "transparent", color: "white", border: "1px solid white", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>✕</button>
+        </div>
+      )}
 
       {/* responsive grid: 1 col mobile, 2 cols tablet portrait, 3-4 cols tablet landscape */}
       <div style={{ flex: 1, width: "100%", overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px", alignContent: "start" }}>
@@ -3511,7 +3605,15 @@ function PaymentMethodPage() {
           return_url: `${window.location.origin}${window.location.pathname}#order-success?order_id=${orderId}&mode=sumup`,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        // Jamais la page « en attente » / « payez au retrait » si le serveur a refuse.
+        setError((lang === "fr" ? "Le paiement n'a pas pu être enregistré. Rafraîchissez la page puis réessayez." : "付款未能登记。请刷新页面后重试。")
+          + (data.error ? ` (${data.error})` : ""));
+        setLoading(false);
+        setSelected(null);
+        return;
+      }
       if (method === "in_person_solo") {
         // Backend sets payment_status="pending_sumup"; customer waits while kitchen sees ⏳ badge
         window.location.hash = `payment-waiting?order_id=${orderId}&amount=${amount}`;

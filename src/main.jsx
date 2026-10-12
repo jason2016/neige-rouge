@@ -2,11 +2,14 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App, { BandeauRecette } from './App.jsx'
+import BandeauMiseAJour from './components/BandeauMiseAJour';
+import { demarrerMiseAJour } from './components/miseAJour';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BandeauRecette />
     <App />
+    <BandeauMiseAJour />
   </StrictMode>,
 )
 
@@ -18,3 +21,6 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error('SW registration failed:', err));
   });
 }
+
+// Recharge la page quand un nouveau deploiement est en ligne (voir miseAJour.js).
+demarrerMiseAJour();
