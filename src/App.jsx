@@ -2627,7 +2627,10 @@ function KitchenPanel() {
             if (o.status !== "pending" || o.payment_status !== "unpaid" || ignorees.has(o.id)) return false;
             if (o.order_source === "reservation") return false;
             const age = maintenant - new Date(o.created_at).getTime();
-            const seuil = (o.payment_method === "online" ? 30 : 5) * 60 * 1000;
+            // 30 min seulement si un paiement en ligne a VRAIMENT ete ouvert (payment_id pose par
+            // Stancer). payment_method ne le dit pas : il vaut « online » par defaut a la creation
+            // (db.create_dine_order) — les cinq commandes bloquees du 2026-10-12 l'avaient toutes.
+            const seuil = (o.payment_id ? 30 : 5) * 60 * 1000;
             return age > seuil;
           }));
         }

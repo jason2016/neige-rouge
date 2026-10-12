@@ -22,6 +22,28 @@ export const INTERVALLE_VERSION_MS = 60000;
 const INTERVALLE_TENTATIVE_MS = 3000;
 const CLE_RECHARGE = "nr_maj_recharge";
 
+// Chaque appel a NOTRE API porte la version du bundle (X-Client-Version) : le serveur la note par
+// appareil (tools/version_client.py), ce qui dit si un ecran du restaurant a bien change de version.
+// Pose au chargement du module, donc avant le premier appel de la page. Seulement vers l'API :
+// version.json et les ressources tierces ne la recoivent pas.
+const API_BASE = import.meta.env.VITE_API_BASE || "https://mcp.clawshow.ai";
+if (VERSION && typeof window !== "undefined" && window.fetch && !window.fetch.__nrVersion) {
+  const fetchOrigine = window.fetch.bind(window);
+  const fetchVersionne = (entree, init) => {
+    try {
+      const url = typeof entree === "string" ? entree : (entree && entree.url) || "";
+      if (url.startsWith(API_BASE + "/api/")) {
+        const h = new Headers((init && init.headers) || (typeof entree !== "string" && entree.headers) || undefined);
+        if (!h.has("X-Client-Version")) h.set("X-Client-Version", VERSION);
+        return fetchOrigine(entree, { ...(init || {}), headers: h });
+      }
+    } catch { /* en cas de doute, l'appel part tel quel */ }
+    return fetchOrigine(entree, init);
+  };
+  fetchVersionne.__nrVersion = true;
+  window.fetch = fetchVersionne;
+}
+
 const bloqueurs = new Set();
 const ecouteurs = new Set();
 let operations = 0;
