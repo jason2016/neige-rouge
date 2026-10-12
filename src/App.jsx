@@ -2533,6 +2533,17 @@ function KitchenPanel() {
   // jour s'affiche en haut de l'ecran, avec la consigne de rafraichir.
   const [erreurAction, setErreurAction] = useState("");
   const [lectureEnEchec, setLectureEnEchec] = useState(false);
+  // Commandes « non parvenues » (2026-10-12) : creees, jamais passees en caisse (unpaid) — donc
+  // invisibles dans la grille. Le 2026-10-12, cinq commandes sont restees ainsi sans que la cuisine
+  // le sache. On les signale apres 5 min (30 min pour un paiement en ligne, qui peut etre en cours).
+  const [nonParvenues, setNonParvenues] = useState([]);
+  const [voirNonParvenues, setVoirNonParvenues] = useState(false);
+  const CLE_IGNOREES = `nr_cuisine_ignorees:${NS}`;
+  const lireIgnorees = () => { try { return JSON.parse(localStorage.getItem(CLE_IGNOREES) || "[]"); } catch { return []; } };
+  const ignorer = (id) => {
+    try { localStorage.setItem(CLE_IGNOREES, JSON.stringify([...lireIgnorees(), id].slice(-200))); } catch { /* stockage indisponible */ }
+    setNonParvenues(p => p.filter(o => o.id !== id));
+  };
   // Le son exige un geste. Apres un rechargement (automatique ou non) sans geste, le navigateur peut
   // laisser l'audio suspendu : les bips des nouvelles commandes seraient muets sans que personne le
   // sache. On le dit, et le premier toucher le retablit.
@@ -2610,6 +2621,16 @@ function KitchenPanel() {
         const data = await res.json();
         setLectureEnEchec(false);
         const newOrders = data.orders || [];
+        {
+          const maintenant = Date.now(), ignorees = new Set(lireIgnorees());
+          setNonParvenues(newOrders.filter(o => {
+            if (o.status !== "pending" || o.payment_status !== "unpaid" || ignorees.has(o.id)) return false;
+            if (o.order_source === "reservation") return false;
+            const age = maintenant - new Date(o.created_at).getTime();
+            const seuil = (o.payment_method === "online" ? 30 : 5) * 60 * 1000;
+            return age > seuil;
+          }));
+        }
 
         // Detect new pending orders → auto-show ticket modal
         // Only trigger for orders where payment method has been chosen (not bare "pending")
@@ -2689,6 +2710,13 @@ function KitchenPanel() {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ namespace: NS, payment_method: paymentMethod }),
   }, () => setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: "paid" } : o)));
+
+  // « Mettre en caisse » : le meme appel que la page de commande aurait du reussir, avec le jeton du
+  // personnel. La commande passe « pending_counter » et rejoint la grille au tour suivant.
+  const mettreEnCaisse = (o) => actionCuisine("Mettre en caisse", `${API}/api/neige-rouge/orders/${o.id}/checkout`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ namespace: NS, payment_method: "card_counter" }),
+  }, () => setNonParvenues(p => p.filter(x => x.id !== o.id)));
 
   const markPicked = (id) => actionCuisine("Remis au client", `${API}/api/order/${id}/picked`, {
     method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -2792,6 +2820,22 @@ function KitchenPanel() {
       {sonBloque && (
         <div data-nr="son-bloque" style={{ background: "#ca8a04", color: "#1a1a1a", padding: "10px 16px", fontSize: 18, fontWeight: 800, textAlign: "center", flexShrink: 0 }}>
           🔊 Touchez l'écran pour activer le son · 点击屏幕开启提示音
+        </div>
+      )}
+      {nonParvenues.length > 0 && (
+        <div data-nr="non-parvenues" style={{ background: "#b45309", color: "white", padding: "10px 16px", flexShrink: 0 }}>
+          <div onClick={() => setVoirNonParvenues(v => !v)} style={{ fontSize: 18, fontWeight: 800, textAlign: "center", cursor: "pointer" }}>
+            ⚠ {nonParvenues.length} commande(s) n'ont pas atteint la cuisine · {nonParvenues.length} 张订单未进入厨房 {voirNonParvenues ? "▲" : "▼"}
+          </div>
+          {voirNonParvenues && nonParvenues.map(o => (
+            <div key={o.id} data-nr="non-parvenue" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 8, fontSize: 16 }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800 }}>{o.order_number}</span>
+              <span>{new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+              <span>{Number(o.total_amount || 0).toFixed(2)} €</span>
+              <button onClick={() => mettreEnCaisse(o)} style={{ background: "white", color: "#b45309", border: "none", borderRadius: 8, padding: "6px 12px", fontWeight: 800, cursor: "pointer" }}>Mettre en caisse · 转入收银</button>
+              <button onClick={() => ignorer(o.id)} style={{ background: "transparent", color: "white", border: "1px solid white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Ignorer · 忽略</button>
+            </div>
+          ))}
         </div>
       )}
       {lectureEnEchec && (
