@@ -2115,12 +2115,11 @@ function OrderPage() {
 
   const handleSubmit = async () => {
     if (allCartItems.length === 0) return;
-    if (estPosteComptoir() && !sessionValide()) {
-      // Poste comptoir dont la session a expire : on redemande la connexion au lieu de passer la
-      // commande en « client » sans le dire.
-      setComptoirExpire(true); setConnexionComptoir(true); setShowConfirm(false);
-      return;
-    }
+    // Poste comptoir dont la session a expire (CEO 2026-10-13) : on N'INTERROMPT PAS la commande en
+    // cours — le 2026-10-13 a 11:48, en plein service, l'ecran a bloque une commande pour demander le
+    // mot de passe. Elle part (le serveur la compte « client » faute de jeton, et le journalise),
+    // puis le bandeau « Session expirée » invite a se reconnecter avant la suivante.
+    if (estPosteComptoir() && !sessionValide()) setComptoirExpire(true);
     if (orderType !== "dine_in" && orderType !== "takeaway") {
       setOrderTypeMissing(true);
       setSubmitError(lang === "zh" ? "请选择：堂食 或 打包" : "Veuillez choisir : Sur place ou À emporter");

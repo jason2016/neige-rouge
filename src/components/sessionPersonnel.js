@@ -48,6 +48,13 @@ export const entetesPersonnel = () => {
 // fetch avec le jeton ; sur 401, la session locale est effacée et l'événement est émis (jamais silencieux).
 export async function fetchPersonnel(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), ...entetesPersonnel() } });
+  // Prolongation glissante (2026-10-13) : un jeton de plus d'une heure, utilise avec succes, revient
+  // remplace par un neuf (7 jours). Un appareil en service ne voit donc jamais sa session expirer.
+  try {
+    const neuf = r.ok && r.headers.get("X-Staff-Token");
+    const exp = Number(r.headers.get("X-Staff-Token-Exp"));
+    if (neuf && exp) localStorage.setItem(CLE, JSON.stringify({ token: neuf, expires_at: exp }));
+  } catch { /* stockage indisponible : l'ancien jeton reste valable jusqu'a son terme */ }
   if (r.status === 401) {
     deconnecterPersonnel();
     window.dispatchEvent(new Event(EVT_SESSION_EXPIREE));
