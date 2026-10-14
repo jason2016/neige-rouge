@@ -2532,6 +2532,9 @@ function KitchenPanel() {
   // jour s'affiche en haut de l'ecran, avec la consigne de rafraichir.
   const [erreurAction, setErreurAction] = useState("");
   const [lectureEnEchec, setLectureEnEchec] = useState(false);
+  // File tronquee (2026-10-14) : le serveur plafonne a `limite` commandes ouvertes et le DIT ; on l'affiche
+  // au lieu de laisser croire que tout est la (avant : 100 commandes du jour, coupees en silence).
+  const [fileTronquee, setFileTronquee] = useState(0);
   // Commandes « non parvenues » (2026-10-12) : creees, jamais passees en caisse (unpaid) — donc
   // invisibles dans la grille. Le 2026-10-12, cinq commandes sont restees ainsi sans que la cuisine
   // le sache. On les signale apres 5 min (30 min pour un paiement en ligne, qui peut etre en cours).
@@ -2619,6 +2622,7 @@ function KitchenPanel() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setLectureEnEchec(false);
+        setFileTronquee(data.tronquee ? (data.limite || data.total || 0) : 0);
         const newOrders = data.orders || [];
         {
           const maintenant = Date.now(), ignorees = new Set(lireIgnorees());
@@ -2838,6 +2842,11 @@ function KitchenPanel() {
               <button onClick={() => ignorer(o.id)} style={{ background: "transparent", color: "white", border: "1px solid white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Ignorer · 忽略</button>
             </div>
           ))}
+        </div>
+      )}
+      {fileTronquee > 0 && (
+        <div data-nr="file-tronquee" style={{ background: "#c2410c", color: "white", padding: "10px 16px", fontSize: 17, fontWeight: 700, textAlign: "center", flexShrink: 0 }}>
+          ⚠ Plus de {fileTronquee} commandes en cours : les plus récentes ne sont pas affichées · 超过 {fileTronquee} 张订单,最新的订单未显示
         </div>
       )}
       {lectureEnEchec && (
