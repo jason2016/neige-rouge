@@ -2854,8 +2854,13 @@ function KitchenPanel() {
         </div>
       )}
 
-      {/* responsive grid: 1 col mobile, 2 cols tablet portrait, 3-4 cols tablet landscape */}
-      <div style={{ flex: 1, width: "100%", overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px", alignContent: "start" }}>
+      {/* responsive grid: 1 col mobile, 2 cols tablet portrait, 3-4 cols tablet landscape.
+          gridAutoRows max-content : une carte a overflow:hidden (pour son bandeau a bords negatifs),
+          donc sa hauteur minimale automatique vaut 0 ; sans cette ligne, des que les cartes ne
+          tiennent plus en hauteur, les rangees se partagent l'ecran et chaque carte est COUPEE —
+          options et boutons invisibles, et faire defiler n'y change rien. 2026-10-14 : tablette
+          Android en paysage, 9 commandes, une seule ligne de plat visible et aucun bouton. */}
+      <div style={{ flex: 1, minHeight: 0, width: "100%", overflowY: "auto", padding: "10px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gridAutoRows: "max-content", gap: "10px", alignContent: "start" }}>
         {allDisplayOrders.length === 0 && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px 0", color: "#555", fontSize: 22 }}>
             Aucune commande · 暂无订单
